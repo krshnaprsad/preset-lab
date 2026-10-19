@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Preset Lab - make Lightroom and Camera Raw presets from a reference photo by Zero3</title>
 <meta name="description" content="Free tool for Lightroom and Camera Raw. Pick a reference photo and your own photo, and download an .xmp preset that moves your photo toward that look. Runs in your browser, nothing is uploaded.">
-<link rel="stylesheet" href="app.css?v=1.4.2">
+<link rel="stylesheet" href="app.css?v=1.4.3">
 </head>
 <body>
-<header class="hd"><span class="logo" role="img" aria-label="Zero3 Creatives"></span><div><h1>Preset Lab</h1><p class="tag">Match a look from a reference photo. Get a Lightroom and Camera Raw preset (.xmp)</p></div><span class="ver">v1.4.2</span></header>
+<header class="hd"><span class="logo" role="img" aria-label="Zero3 Creatives"></span><div><h1>Preset Lab</h1><p class="tag">Match a look from a reference photo. Get a Lightroom and Camera Raw preset (.xmp)</p></div><span class="ver">v1.4.3</span></header>
 <main>
   <div class="grid">
     <div class="side">
@@ -92,7 +92,7 @@
         </details>
         <details class="how">
           <summary>What it cannot do</summary>
-          <p>RAW files (DNG, CR2, CR3, NEF, ARW, RAF, ORF, RW2 and more) open through the full-size JPEG preview the camera stores inside them. It does not decode the raw sensor data, so the picture is the camera's own rendering, and the edited picture you download is the size of that preview.</p>
+          <p>RAW files (DNG, CR2, CR3, NEF, ARW, RAF, ORF, RW2 and more) open through the full-size JPEG preview the camera stores inside them. The picture is the camera's own rendering, and the edited picture you download is the size of that preview. A DNG with no preview (some Xiaomi and OnePlus phones) is read from its plain sensor data at half size with a simple automatic look, not Adobe's. Other RAW files with no preview give a message.</p>
           <p>When it matches from a reference photo, it cannot copy masks, local edits, crops, grain, or a camera profile. It cannot read the settings of the reference, only the picture, so the result is an estimate of the look. Colours are matched from the overall picture, so a reference with very different content (for example a night street against a green forest) can pull colours the wrong way. Lower the sliders and check faces.</p>
         </details>
         </details>
@@ -119,12 +119,12 @@
   </div>
   <p class="foot">Made by <b><a class="z3" href="https://www.zero3creatives.net/">Zero3</a></b>. Free to use, not free to copy. Everything runs in your browser, nothing is uploaded. <a href="https://github.com/krshnaprsad/preset-lab">Source on GitHub</a></p>
 </main>
-<script src="presets-1.js?v=1.4.2"></script>
-<script src="presets-2.js?v=1.4.2"></script>
-<script src="presets-3.js?v=1.4.2"></script>
-<script src="presets-4.js?v=1.4.2"></script>
-<script src="raw.js?v=1.4.2"></script>
-<script src="xmp.js?v=1.4.2"></script>
-<script src="app.js?v=1.4.2"></script>
+<script src="presets-1.js?v=1.4.3"></script>
+<script src="presets-2.js?v=1.4.3"></script>
+<script src="presets-3.js?v=1.4.3"></script>
+<script src="presets-4.js?v=1.4.3"></script>
+<script src="raw.js?v=1.4.3"></script>
+<script src="xmp.js?v=1.4.3"></script>
+<script src="app.js?v=1.4.3"></script>
 </body>
 </html>
