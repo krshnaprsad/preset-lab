@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Preset Lab - make Lightroom and Camera Raw presets from a reference photo by Zero3</title>
 <meta name="description" content="Free tool for Lightroom and Camera Raw. Pick a reference photo and your own photo, and download an .xmp preset that moves your photo toward that look. Runs in your browser, nothing is uploaded.">
-<link rel="stylesheet" href="app.css?v=1.1.0">
+<link rel="stylesheet" href="app.css?v=1.2.0">
 </head>
 <body>
-<header class="hd"><span class="logo" role="img" aria-label="Zero3 Creatives"></span><div><h1>Preset Lab</h1><p class="tag">Match a look from a reference photo. Get a Lightroom and Camera Raw preset (.xmp)</p></div><span class="ver">v1.1.0</span></header>
+<header class="hd"><span class="logo" role="img" aria-label="Zero3 Creatives"></span><div><h1>Preset Lab</h1><p class="tag">Match a look from a reference photo. Get a Lightroom and Camera Raw preset (.xmp)</p></div><span class="ver">v1.2.0</span></header>
 <main>
   <div class="grid">
     <div class="side">
@@ -29,12 +29,23 @@
       </section>
 
       <section class="card">
-        <h2>2. What is in the preset</h2>
+        <h2>2. Fine tune</h2>
+        <p class="note first">Optional. These sit on top of the match and go into the preset file. Double-click a slider to zero it. Works without a reference photo too.</p>
+        <div id="tune"></div>
+        <div class="row"><button class="btn" id="tuneReset">Reset sliders</button></div>
+        <h3>Tone curve</h3>
+        <canvas id="curveCv" width="256" height="256" class="curvecv" aria-label="Tone curve editor"></canvas>
+        <p class="note" id="curveNote"></p>
+        <div class="row"><button class="btn" id="curveReset" hidden>Back to the match curve</button></div>
+      </section>
+
+      <section class="card">
+        <h2>3. What is in the preset</h2>
         <ul class="report" id="report"><li class="info"><span class="k">Note</span><span>Choose a reference photo to see the settings.</span></li></ul>
       </section>
 
       <section class="card">
-        <h2>3. Save your preset</h2>
+        <h2>4. Save your preset</h2>
         <label>Preset name <input type="text" id="name" value="Preset Lab look" maxlength="60"></label>
         <label>Group <input type="text" id="group" value="Preset Lab" maxlength="40"></label>
         <div class="row"><button class="btn go" id="dl" disabled>Download .xmp</button></div>
@@ -76,7 +87,7 @@
   </div>
   <p class="foot">Made by <b><a class="z3" href="https://www.zero3creatives.net/">Zero3</a></b>. Free to use, not free to copy. Everything runs in your browser, nothing is uploaded. <a href="https://github.com/krshnaprsad/preset-lab">Source on GitHub</a></p>
 </main>
-<script src="xmp.js?v=1.1.0"></script>
-<script src="app.js?v=1.1.0"></script>
+<script src="xmp.js?v=1.2.0"></script>
+<script src="app.js?v=1.2.0"></script>
 </body>
 </html>
