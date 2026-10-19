@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Preset Lab - make Lightroom and Camera Raw presets from a reference photo by Zero3</title>
 <meta name="description" content="Free tool for Lightroom and Camera Raw. Pick a reference photo and your own photo, and download an .xmp preset that moves your photo toward that look. Runs in your browser, nothing is uploaded.">
-<link rel="stylesheet" href="app.css?v=1.4.1">
+<link rel="stylesheet" href="app.css?v=1.4.2">
 </head>
 <body>
-<header class="hd"><span class="logo" role="img" aria-label="Zero3 Creatives"></span><div><h1>Preset Lab</h1><p class="tag">Match a look from a reference photo. Get a Lightroom and Camera Raw preset (.xmp)</p></div><span class="ver">v1.4.1</span></header>
+<header class="hd"><span class="logo" role="img" aria-label="Zero3 Creatives"></span><div><h1>Preset Lab</h1><p class="tag">Match a look from a reference photo. Get a Lightroom and Camera Raw preset (.xmp)</p></div><span class="ver">v1.4.2</span></header>
 <main>
   <div class="grid">
     <div class="side">
@@ -19,9 +19,11 @@
         <p class="note first">Choose a photo with the look you want. Preset Lab works out settings that move your photo toward it.</p>
         <div class="row">
           <button class="btn" id="refBtn">Choose reference photo</button>
+          <button class="btn" id="refRawBtn">RAW file</button>
           <img id="refThumb" class="thumb" alt="" hidden>
         </div>
-        <input type="file" id="refFile" accept="image/*,.dng,.cr2,.cr3,.crw,.nef,.nrw,.arw,.srf,.sr2,.raf,.orf,.rw2,.rwl,.raw,.pef,.ptx,.srw,.x3f,.3fr,.fff,.erf,.kdc,.dcr,.mrw,.mef,.mos,.iiq,.cap,.gpr" hidden>
+        <input type="file" id="refFile" accept="image/*" hidden>
+        <input type="file" id="refRaw" hidden>
         <p class="msg" id="refMsg"></p>
         <h3>How far to go</h3>
         <label class="rng">Match brightness <input type="range" id="pTone" min="0" max="1" step="0.01" value="0.8"><span id="pToneVal">0.80</span></label>
@@ -100,10 +102,12 @@
     <section class="card stagecard">
       <div class="row bar">
         <button class="btn" id="footBtn">Choose your photo</button>
+        <button class="btn" id="footRawBtn">Choose RAW file</button>
         <button class="btn" id="sampleBtn">Use sample picture</button>
         <span class="dim" id="footNote">Showing the sample picture. Drop a photo or RAW file here, or use the button.</span>
       </div>
-      <input type="file" id="footFile" accept="image/*,.dng,.cr2,.cr3,.crw,.nef,.nrw,.arw,.srf,.sr2,.raf,.orf,.rw2,.rwl,.raw,.pef,.ptx,.srw,.x3f,.3fr,.fff,.erf,.kdc,.dcr,.mrw,.mef,.mos,.iiq,.cap,.gpr" hidden>
+      <input type="file" id="footFile" accept="image/*" hidden>
+      <input type="file" id="footRaw" hidden>
       <div class="stage" id="stage">
         <canvas id="cv" width="960" height="540"></canvas>
         <span class="tagl">Before</span><span class="tagr">After</span>
@@ -115,12 +119,12 @@
   </div>
   <p class="foot">Made by <b><a class="z3" href="https://www.zero3creatives.net/">Zero3</a></b>. Free to use, not free to copy. Everything runs in your browser, nothing is uploaded. <a href="https://github.com/krshnaprsad/preset-lab">Source on GitHub</a></p>
 </main>
-<script src="presets-1.js?v=1.4.1"></script>
-<script src="presets-2.js?v=1.4.1"></script>
-<script src="presets-3.js?v=1.4.1"></script>
-<script src="presets-4.js?v=1.4.1"></script>
-<script src="raw.js?v=1.4.1"></script>
-<script src="xmp.js?v=1.4.1"></script>
-<script src="app.js?v=1.4.1"></script>
+<script src="presets-1.js?v=1.4.2"></script>
+<script src="presets-2.js?v=1.4.2"></script>
+<script src="presets-3.js?v=1.4.2"></script>
+<script src="presets-4.js?v=1.4.2"></script>
+<script src="raw.js?v=1.4.2"></script>
+<script src="xmp.js?v=1.4.2"></script>
+<script src="app.js?v=1.4.2"></script>
 </body>
 </html>
