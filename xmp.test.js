@@ -146,5 +146,22 @@ const brightRow = new Uint8ClampedArray(256 * 4); for (let x = 0; x < 256; x++) 
 const bo = X.render(brightRow, bbS, 256), seen = new Set(); for (let x = 0; x < 256; x++) seen.add(bo[x * 4] + ',' + bo[x * 4 + 1] + ',' + bo[x * 4 + 2]);
 ok(seen.size > 50, 'bright cream tones keep their detail instead of going flat (' + seen.size + ' different colours)');
 
+/* ---- lossless JPEG (compressed DNG data) ---- */
+(function () {
+  const vals = [[100, 120, 90, 4000], [110, 0, 4095, 7], [3, 3, 3, 3]], W = 4, H = 3; let bitsArr = [];
+  const put = (v, n) => { for (let i = n - 1; i >= 0; i--) bitsArr.push((v >> i) & 1); };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const pred = y === 0 ? (x === 0 ? 1 << 11 : vals[0][x - 1]) : (x === 0 ? vals[y - 1][0] : vals[y][x - 1]);
+    const d = vals[y][x] - pred, a = Math.abs(d); let s = 0; while ((1 << s) <= a) s++;
+    put(s, 4); if (s) put(d >= 0 ? d : d + (1 << s) - 1, s);
+  }
+  while (bitsArr.length % 8) bitsArr.push(1);
+  const dat = []; for (let i = 0; i < bitsArr.length; i += 8) { let v = 0; for (let k = 0; k < 8; k++) v = v * 2 + bitsArr[i + k]; dat.push(v); if (v === 255) dat.push(0); }
+  const cnt = new Array(16).fill(0); cnt[3] = 16; const syms = []; for (let i = 0; i < 16; i++) syms.push(i);
+  const jpg = [0xFF, 0xD8, 0xFF, 0xC3, 0, 11, 12, 0, H, 0, W, 1, 1, 0x11, 0, 0xFF, 0xC4, 0, 2 + 17 + 16, 0, ...cnt, ...syms, 0xFF, 0xDA, 0, 8, 1, 1, 0, 1, 0, 0, ...dat, 0xFF, 0xD9];
+  const dj = RW.decodeLJ(new Uint8Array(jpg), 0, jpg.length);
+  ok(dj && dj.width === W && dj.height === H && dj.data.every((v, i) => v === vals[Math.floor(i / W)][i % W]), 'the lossless JPEG decoder gives back the exact values');
+})();
+
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
