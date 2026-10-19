@@ -81,6 +81,8 @@
     $('empty').textContent = (!st.ref && !any) ? 'Choose a reference photo, or move a slider, to see the change.' : '';
     $('dl').disabled = !any; $('dlPic').disabled = !any;
     drawCurve();
+    var edited = !!st.curveOv || TUNE.some(function (t) { return (st.man[t.id] || 0) !== 0; });
+    $('tuneHint').hidden = !edited;
     if (!any) row('info', 'Note', st.ref ? 'These two photos already look alike, so the preset changes almost nothing.' : 'Nothing set yet. Choose a reference photo or move a slider.');
     var d = XMP.describe(st.settings);
     d.forEach(function (t) { row('ok', 'Sets', t); });
