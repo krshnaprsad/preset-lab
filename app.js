@@ -43,7 +43,7 @@
           c.getContext('2d').putImageData(new ImageData(d.data, d.width, d.height), 0, 0);
           var out = toImageData(c, maxW, d.orient); out.fromRaw = true; out.decoded = true; return out;
         }
-        if (d && d.error === 'compressed') throw new Error('This RAW file has no preview picture and its sensor data is stored in a compressed form I cannot open yet. Open it in your RAW editor, save a JPG or TIFF, and use that.');
+        if (d && d.error === 'compressed') throw new Error('This RAW file has no preview picture and its sensor data is stored in a form I cannot open yet (for example JPEG XL). Open it in your RAW editor, save a JPG or TIFF, and use that.');
         throw new Error(why);
       }
       if (!list.length) return fromSensor('This file has no preview picture inside it and I could not read its sensor data, so I cannot show it. Open it in your RAW editor, save a JPG or TIFF, and use that.');
@@ -253,7 +253,7 @@
   $('footRawBtn').onclick = function () { $('footRaw').click(); };
   $('footRaw').onchange = function () { loadFoot($('footRaw').files[0]); $('footRaw').value = ''; };
   $('sampleBtn').onclick = function () { setFoot(sampleImage(), 'Showing the sample picture. Drop a photo or RAW file here, or use the button.'); };
-  function loadFoot(f) { if (!f) return; $('footNote').style.color = ''; $('footNote').textContent = 'Opening ' + f.name + '...'; readImage(f, MAXW).then(function (img) { setFoot(img, 'Your photo: ' + f.name + (img.decoded ? ' (read from the RAW sensor data at half size, plain automatic colour)' : img.fromRaw ? ' (the preview picture stored inside the RAW file)' : ''), f); }).catch(function (e) { $('footNote').style.color = '#ff8a8a'; $('footNote').textContent = e.message; }); }
+  function loadFoot(f) { if (!f) return; $('footNote').style.color = ''; $('footNote').textContent = 'Opening ' + f.name + '...'; readImage(f, MAXW).then(function (img) { setFoot(img, 'Your photo: ' + f.name + (img.decoded ? ' (read from the RAW sensor data at reduced size, plain automatic colour)' : img.fromRaw ? ' (the preview picture stored inside the RAW file)' : ''), f); }).catch(function (e) { $('footNote').style.color = '#ff8a8a'; $('footNote').textContent = e.message; }); }
   var stage = $('stage');
   ['dragenter', 'dragover'].forEach(function (ev) { stage.addEventListener(ev, function (e) { e.preventDefault(); stage.classList.add('drop'); }); });
   ['dragleave', 'drop'].forEach(function (ev) { stage.addEventListener(ev, function (e) { e.preventDefault(); stage.classList.remove('drop'); }); });
@@ -264,7 +264,7 @@
   $('refFile').onchange = $('refRaw').onchange = function () {
     var inp = this, f = inp.files[0]; inp.value = ''; if (!f) return;
     $('refMsg').textContent = ''; readImage(f, 600).then(function (img) {
-      st.ref = img; $('refMsg').textContent = img.decoded ? 'Read from the RAW sensor data at half size.' : img.fromRaw ? 'Used the preview picture stored inside the RAW file.' : ''; st.fid++;
+      st.ref = img; $('refMsg').textContent = img.decoded ? 'Read from the RAW sensor data at reduced size.' : img.fromRaw ? 'Used the preview picture stored inside the RAW file.' : ''; st.fid++;
       var c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').putImageData(img, 0, 0);
       var t = $('refThumb'); t.src = c.toDataURL('image/jpeg', 0.8); t.hidden = false;
       $('refBtn').textContent = 'Change reference photo'; refresh();
