@@ -1,0 +1,10 @@
+{
+  "name": "preset-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Make Lightroom and Camera Raw .xmp presets from a reference photo. Runs fully in the browser.",
+  "scripts": {
+    "test": "node xmp.test.js"
+  },
+  "license": "SEE LICENSE IN LICENSE"
+}
