@@ -22,6 +22,10 @@ There are 340 built-in presets you can pick from instead of using a reference ph
 
 Pick one and it is applied to your photo, then you can still change it in Fine tune. The preview draws exposure, tone, white balance, saturation, the colour mixer (hue, saturation and brightness), the tone curves, split toning, the parametric curve and vignette. Clarity, Texture, Dehaze, Grain and Calibration are written into the file but the preview does not draw them, and the page says so when a preset uses them. One preset also had a local mask in the original. Masks are not copied, so that one is the version without it.
 
+## Preset strength
+
+A Preset strength slider sits under the picture. It goes from 0 to 100 percent (100 is the full preset) and scales everything the preset does, whether it came from a reference photo or from the built-in list: the sliders, the colour mixer, split toning, the curves and the rest. The preset file you download has the reduced values written into it, so it matches what you see.
+
 ## RAW files
 
 You can load a camera RAW file as your photo or as the reference: DNG, CR2, CR3, NEF, ARW, RAF, ORF, RW2 and more (full list in raw.js). I do not decode the raw sensor data. Almost every RAW file carries a full-size JPEG preview that the camera made, and Preset Lab finds that and uses it. It all happens in your browser, nothing is uploaded.
@@ -56,7 +60,7 @@ Adobe says Lightroom Classic 8.2 and earlier cannot import .xmp presets.
 
 ## How I checked it
 
-`npm test` runs 58 checks. They cover finding the preview inside a RAW file, the 340 built-in presets (each writes a valid file, keeps its credit text, and reads back to the same picture), the curve maths, writing and reading the file, a validity check on the XMP (namespaces, the id, value ranges, curve order, balanced tags), names with odd characters, what each Fine tune slider does to dark and light areas, and that a brighter, warmer reference moves a photo the right way. A photo matched against itself comes out unchanged.
+`npm test` runs 64 checks. They cover finding the preview inside a RAW file, the 340 built-in presets (each writes a valid file, keeps its credit text, and reads back to the same picture), the curve maths, writing and reading the file, a validity check on the XMP (namespaces, the id, value ranges, curve order, balanced tags), names with odd characters, what each Fine tune slider does to dark and light areas, and that a brighter, warmer reference moves a photo the right way. A photo matched against itself comes out unchanged.
 
 Every time you press Download, the page also reads the file back and checks that it gives the same picture as the preview.
 
