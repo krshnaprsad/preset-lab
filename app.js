@@ -215,6 +215,8 @@
   /* ---------- inputs ---------- */
   $('footBtn').onclick = function () { $('footFile').click(); };
   $('footFile').onchange = function () { loadFoot($('footFile').files[0]); $('footFile').value = ''; };
+  $('footRawBtn').onclick = function () { $('footRaw').click(); };
+  $('footRaw').onchange = function () { loadFoot($('footRaw').files[0]); $('footRaw').value = ''; };
   $('sampleBtn').onclick = function () { setFoot(sampleImage(), 'Showing the sample picture. Drop a photo or RAW file here, or use the button.'); };
   function loadFoot(f) { if (!f) return; $('footNote').textContent = 'Opening ' + f.name + '...'; readImage(f, MAXW).then(function (img) { setFoot(img, 'Your photo: ' + f.name + (img.fromRaw ? ' (the preview picture stored inside the RAW file)' : ''), f); }).catch(function (e) { $('footNote').textContent = e.message; }); }
   var stage = $('stage');
@@ -223,8 +225,9 @@
   stage.addEventListener('drop', function (e) { var f = e.dataTransfer && e.dataTransfer.files[0]; if (f && (/^image\//.test(f.type) || (window.RAWX && RAWX.isRaw(f.name)))) loadFoot(f); });
 
   $('refBtn').onclick = function () { $('refFile').click(); };
-  $('refFile').onchange = function () {
-    var f = $('refFile').files[0]; $('refFile').value = ''; if (!f) return;
+  $('refRawBtn').onclick = function () { $('refRaw').click(); };
+  $('refFile').onchange = $('refRaw').onchange = function () {
+    var inp = this, f = inp.files[0]; inp.value = ''; if (!f) return;
     $('refMsg').textContent = ''; readImage(f, 600).then(function (img) {
       st.ref = img; $('refMsg').textContent = img.fromRaw ? 'Used the preview picture stored inside the RAW file.' : ''; st.fid++;
       var c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').putImageData(img, 0, 0);
