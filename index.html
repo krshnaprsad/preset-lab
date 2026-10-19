@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Preset Lab - make Lightroom and Camera Raw presets from a reference photo by Zero3</title>
 <meta name="description" content="Free tool for Lightroom and Camera Raw. Pick a reference photo and your own photo, and download an .xmp preset that moves your photo toward that look. Runs in your browser, nothing is uploaded.">
-<link rel="stylesheet" href="app.css?v=1.0.0">
+<link rel="stylesheet" href="app.css?v=1.1.0">
 </head>
 <body>
-<header class="hd"><span class="logo" role="img" aria-label="Zero3 Creatives"></span><div><h1>Preset Lab</h1><p class="tag">Match a look from a reference photo. Get a Lightroom and Camera Raw preset (.xmp)</p></div><span class="ver">v1.0.0</span></header>
+<header class="hd"><span class="logo" role="img" aria-label="Zero3 Creatives"></span><div><h1>Preset Lab</h1><p class="tag">Match a look from a reference photo. Get a Lightroom and Camera Raw preset (.xmp)</p></div><span class="ver">v1.1.0</span></header>
 <main>
   <div class="grid">
     <div class="side">
@@ -39,6 +39,13 @@
         <label>Group <input type="text" id="group" value="Preset Lab" maxlength="40"></label>
         <div class="row"><button class="btn go" id="dl" disabled>Download .xmp</button></div>
         <p class="msg" id="msg"></p>
+        <h3>Or save the edited picture</h3>
+        <div class="row">
+          <button class="btn" id="dlPic" disabled>Download edited picture</button>
+          <select id="picFmt" aria-label="Picture format"><option value="png">PNG (lossless)</option><option value="jpg">JPG (highest quality)</option></select>
+        </div>
+        <p class="note">This saves the After picture at the native pixel size of the photo you loaded, not shrunk or compressed (PNG is lossless, JPG is saved at top quality). It is the tool's own preview maths, so it may differ slightly from what Lightroom gives with the preset. The preset file is the one to trust in Lightroom.</p>
+        <p class="msg" id="picMsg"></p>
         <details class="how">
           <summary>How to use it in Lightroom</summary>
           <p><b>Lightroom Classic.</b> Open the Develop module. In the Presets panel on the left, click the plus (+) icon and choose Import Presets. Pick the downloaded .xmp file. It appears under the group name you chose. Click it to apply it to a photo.</p>
@@ -69,7 +76,7 @@
   </div>
   <p class="foot">Made by <b><a class="z3" href="https://www.zero3creatives.net/">Zero3</a></b>. Free to use, not free to copy. Everything runs in your browser, nothing is uploaded. <a href="https://github.com/krshnaprsad/preset-lab">Source on GitHub</a></p>
 </main>
-<script src="xmp.js?v=1.0.0"></script>
-<script src="app.js?v=1.0.0"></script>
+<script src="xmp.js?v=1.1.0"></script>
+<script src="app.js?v=1.1.0"></script>
 </body>
 </html>
