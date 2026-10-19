@@ -121,5 +121,17 @@ const vigS = Object.assign(X.identity(), { extra: { PostCropVignetteAmount: -80 
 const vg = X.render(pics(12, () => [200, 200, 200]), vigS, 64), vgi = vg.length / 4;
 ok(vg[0] < vg[(156 * 64 + 32) * 4], 'vignette darkens the corners');
 
+/* ---- RAW preview finder ---- */
+const RW = require('./raw.js');
+function fakeJpeg(size, extra) { const body = []; body.push(0xFF, 0xD8, 0xFF, 0xE0, 0, 4, 0, 0); if (extra) { body.push(0xFF, 0xE1, (extra.length + 2) >> 8, (extra.length + 2) & 255); extra.forEach((v) => body.push(v)); } body.push(0xFF, 0xC0, 0, 11, 8, 0, 8, 0, 8, 1, 1, 0x11, 0, 0xFF, 0xDA, 0, 8, 1, 1, 0, 0, 63, 0); for (let i = 0; i < size; i++) body.push(i % 251 + 1 > 254 ? 7 : (i % 250) + 1, ...(i % 97 === 0 ? [0xFF, 0x00] : [])); body.push(0xFF, 0xD9); return body; }
+const thumb = fakeJpeg(3000), big = fakeJpeg(60000, thumb), mid = fakeJpeg(40000);
+const tiffHdr = [0x49, 0x49, 0x2A, 0, 8, 0, 0, 0, 1, 0, 0x12, 0x01, 3, 0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0];
+const rawLike = new Uint8Array([...tiffHdr, ...new Array(500).fill(0x55), ...mid, ...new Array(300).fill(0xFF), ...big, ...new Array(100).fill(9)]);
+const pk = RW.pick(rawLike);
+ok(pk && pk.length === big.length, 'RAW finder picks the biggest preview and skips the thumbnail inside it');
+ok(pk && pk.orient === 6, 'RAW finder reads the turn from the file header when the preview has none');
+ok(RW.pick(new Uint8Array(5000).fill(3)) === null, 'RAW finder returns nothing for a file with no picture');
+ok(RW.isRaw('IMG_1.CR3') && RW.isRaw('a.dng') && !RW.isRaw('photo.jpg'), 'RAW extensions recognised');
+
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
