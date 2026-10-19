@@ -4,7 +4,7 @@
   var cv = $('cv'), ctx = cv.getContext('2d');
   var MAXW = 960;
 
-  var st = { foot: null, ref: null, settings: null, graded: null, split: 0.5 };
+  var st = { file: null, foot: null, ref: null, settings: null, graded: null, split: 0.5 };
 
   /* ---------- images ---------- */
   function toImageData(bmp, maxW) {
@@ -39,8 +39,8 @@
     x.fillStyle = '#fff'; x.font = '700 28px system-ui,Arial'; x.fillText('Sample frame', 60, 496);
     return x.getImageData(0, 0, c.width, c.height);
   }
-  function setFoot(img, label) {
-    st.foot = img; cv.width = img.width; cv.height = img.height;
+  function setFoot(img, label, file) {
+    st.file = file || null; st.foot = img; cv.width = img.width; cv.height = img.height;
     $('footNote').textContent = label; refresh();
   }
 
@@ -58,14 +58,14 @@
       var tx = document.createElement('span'); tx.textContent = text; li.appendChild(k); li.appendChild(tx); ul.appendChild(li);
     }
     if (!st.ref || !st.foot) {
-      st.settings = null; st.graded = null; $('dl').disabled = true;
+      st.settings = null; st.graded = null; $('dl').disabled = true; $('dlPic').disabled = true;
       $('empty').textContent = st.ref ? '' : 'Choose a reference photo to see the match.';
       row('info', 'Note', 'Choose a reference photo to see the settings.');
       draw(); return;
     }
     st.settings = XMP.derive(st.foot.data, st.ref.data, opts());
     st.graded = new ImageData(XMP.render(st.foot.data, st.settings), st.foot.width, st.foot.height);
-    $('empty').textContent = ''; $('dl').disabled = false;
+    $('empty').textContent = ''; $('dl').disabled = false; $('dlPic').disabled = false;
     var d = XMP.describe(st.settings);
     if (!d.length) row('ok', 'Note', 'These two photos already look alike, so the preset changes almost nothing.');
     d.forEach(function (t) { row('ok', 'Sets', t); });
@@ -103,7 +103,7 @@
   $('footBtn').onclick = function () { $('footFile').click(); };
   $('footFile').onchange = function () { loadFoot($('footFile').files[0]); $('footFile').value = ''; };
   $('sampleBtn').onclick = function () { setFoot(sampleImage(), 'Showing the sample picture. Drop an image here, or use the button.'); };
-  function loadFoot(f) { if (!f) return; readImage(f, MAXW).then(function (img) { setFoot(img, 'Your photo: ' + f.name); }).catch(function (e) { say(e.message, 'err'); }); }
+  function loadFoot(f) { if (!f) return; readImage(f, MAXW).then(function (img) { setFoot(img, 'Your photo: ' + f.name, f); }).catch(function (e) { say(e.message, 'err'); }); }
   var stage = $('stage');
   ['dragenter', 'dragover'].forEach(function (ev) { stage.addEventListener(ev, function (e) { e.preventDefault(); stage.classList.add('drop'); }); });
   ['dragleave', 'drop'].forEach(function (ev) { stage.addEventListener(ev, function (e) { e.preventDefault(); stage.classList.remove('drop'); }); });
@@ -142,6 +142,35 @@
     var url = URL.createObjectURL(new Blob([text], { type: 'application/rdf+xml' })), a2 = document.createElement('a');
     a2.href = url; a2.download = cleanName() + '.xmp'; document.body.appendChild(a2); a2.click(); a2.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  };
+
+  /* ---------- export the edited picture ---------- */
+  var MAX_PIXELS = 60e6;
+  function picSay(t, cls) { var m = $('picMsg'); m.textContent = t; m.className = 'msg' + (cls ? ' ' + cls : ''); }
+  function fullImage() {
+    if (!st.file) return Promise.resolve(st.foot);
+    return readImage(st.file, 1e9);
+  }
+  $('dlPic').onclick = function () {
+    if (!st.settings) return;
+    var btn = $('dlPic'); btn.disabled = true; picSay('Working on the full size picture...');
+    var settings = st.settings, fmt = $('picFmt').value, base = cleanName();
+    setTimeout(function () {
+      fullImage().then(function (img) {
+        if (img.width * img.height > MAX_PIXELS) throw new Error('That photo is too large to edit in the browser (over 60 megapixels). Use a smaller export of it.');
+        var out = new ImageData(XMP.render(img.data, settings), img.width, img.height);
+        var c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+        c.getContext('2d').putImageData(out, 0, 0);
+        return new Promise(function (res, rej) {
+          c.toBlob(function (b) { b ? res({ blob: b, w: img.width, h: img.height }) : rej(new Error('The browser could not make the picture file.')); }, fmt === 'jpg' ? 'image/jpeg' : 'image/png', 1);
+        });
+      }).then(function (r) {
+        var url = URL.createObjectURL(r.blob), a = document.createElement('a');
+        a.href = url; a.download = base + ' edited.' + fmt; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        picSay('Saved ' + r.w + ' x ' + r.h + ' ' + fmt.toUpperCase() + '. This is the tool\'s own preview, so Lightroom may differ slightly.', 'ok');
+      }).catch(function (e) { picSay(e.message || 'Could not save the picture.', 'err'); }).then(function () { btn.disabled = !st.settings; });
+    }, 30);
   };
 
   window.PRESET_STATE = st; // for checking in the console
