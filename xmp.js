@@ -51,8 +51,31 @@
   /* ---------- settings ---------- */
   X.curveIdentity = function () { return [[0, 0], [255, 255]]; };
   X.identity = function () {
-    return { exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0, vibrance: 0, temp: 0, tint: 0, sat: 0, hue: [0, 0, 0, 0, 0, 0, 0, 0], bsat: [0, 0, 0, 0, 0, 0, 0, 0], curve: X.curveIdentity(), curveR: X.curveIdentity(), curveG: X.curveIdentity(), curveB: X.curveIdentity() };
+    return { exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0, vibrance: 0, temp: 0, tint: 0, sat: 0, hue: [0, 0, 0, 0, 0, 0, 0, 0], bsat: [0, 0, 0, 0, 0, 0, 0, 0], curve: X.curveIdentity(), curveR: X.curveIdentity(), curveG: X.curveIdentity(), curveB: X.curveIdentity(), lum: [0, 0, 0, 0, 0, 0, 0, 0], extra: {} };
   };
+  /* Settings that are kept and written, with their file names. Signed ones are written with + or -. */
+  X.EXTRA_SIGNED = ['Texture', 'Clarity2012', 'Dehaze', 'ShadowTint', 'RedHue', 'RedSaturation', 'GreenHue', 'GreenSaturation', 'BlueHue', 'BlueSaturation'];
+  X.EXTRA_PLAIN = ['SplitToningShadowHue', 'SplitToningShadowSaturation', 'SplitToningHighlightHue', 'SplitToningHighlightSaturation', 'SplitToningBalance',
+    'ParametricShadows', 'ParametricDarks', 'ParametricLights', 'ParametricHighlights', 'ParametricShadowSplit', 'ParametricMidtoneSplit', 'ParametricHighlightSplit',
+    'GrainAmount', 'GrainSize', 'GrainFrequency', 'PostCropVignetteAmount', 'PostCropVignetteMidpoint', 'PostCropVignetteFeather', 'PostCropVignetteRoundness', 'PostCropVignetteStyle', 'PostCropVignetteHighlightContrast'];
+  var EXTRA_DEF = { ParametricShadowSplit: 25, ParametricMidtoneSplit: 50, ParametricHighlightSplit: 75, PostCropVignetteMidpoint: 50, PostCropVignetteFeather: 50, GrainSize: 25, GrainFrequency: 50, PostCropVignetteStyle: 1 };
+  /* Turn a library preset ({v: file values, c: curves}) into settings. */
+  X.fromPreset = function (p) {
+    var S = X.identity(), v = p.v || {};
+    S.exposure = v.Exposure2012 || 0; S.contrast = v.Contrast2012 || 0; S.highlights = v.Highlights2012 || 0; S.shadows = v.Shadows2012 || 0;
+    S.whites = v.Whites2012 || 0; S.blacks = v.Blacks2012 || 0; S.vibrance = v.Vibrance || 0; S.sat = v.Saturation || 0;
+    S.temp = v.IncrementalTemperature || 0; S.tint = v.IncrementalTint || 0;
+    X.BANDS.forEach(function (n, i) { S.hue[i] = v['HueAdjustment' + n] || 0; S.bsat[i] = v['SaturationAdjustment' + n] || 0; S.lum[i] = v['LuminanceAdjustment' + n] || 0; });
+    X.EXTRA_SIGNED.concat(X.EXTRA_PLAIN).forEach(function (k) { if (v[k] !== undefined) S.extra[k] = v[k]; });
+    var c = p.c || {};
+    if (c.m) S.curve = c.m.map(function (q) { return q.slice(); });
+    if (c.r) S.curveR = c.r.map(function (q) { return q.slice(); });
+    if (c.g) S.curveG = c.g.map(function (q) { return q.slice(); });
+    if (c.b) S.curveB = c.b.map(function (q) { return q.slice(); });
+    return S;
+  };
+  function ex(S, k) { var v = S.extra && S.extra[k]; return v === undefined ? (EXTRA_DEF[k] || 0) : v; }
+  function hsv2rgb(h, o) { h = ((h % 360) + 360) % 360 / 60; var f = h - Math.floor(h), i = Math.floor(h) % 6, q = 1 - f; var t = [[1, f, 0], [q, 1, 0], [0, 1, f], [0, q, 1], [f, 0, 1], [1, 0, q]][i]; o[0] = t[0]; o[1] = t[1]; o[2] = t[2]; }
   function isIdCurve(c) { return c.length === 2 && c[0][0] === 0 && c[0][1] === 0 && c[1][0] === 255 && c[1][1] === 255; }
   X.isIdentityCurve = isIdCurve;
 
@@ -83,15 +106,24 @@
 
   /* ---------- render: apply the settings to pixels (RGBA bytes) ---------- */
   function ss01(a, b, x) { var u = clamp((x - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); }
-  X.render = function (px, S) {
+  X.render = function (px, S, width) {
     var out = new Uint8ClampedArray(px.length), n = px.length / 4, w = [0, 0, 0, 0, 0, 0, 0, 0], lab = [0, 0, 0], rgb = [0, 0, 0];
-    var useColour = S.sat !== 0 || S.hue.some(function (v) { return v !== 0; }) || S.bsat.some(function (v) { return v !== 0; });
+    var LU = S.lum || [0, 0, 0, 0, 0, 0, 0, 0], useLum = LU.some(function (v) { return v !== 0; });
+    var useColour = S.sat !== 0 || useLum || S.hue.some(function (v) { return v !== 0; }) || S.bsat.some(function (v) { return v !== 0; });
+    var PS = ex(S, 'ParametricShadows') / 100, PD = ex(S, 'ParametricDarks') / 100, PL = ex(S, 'ParametricLights') / 100, PH = ex(S, 'ParametricHighlights') / 100;
+    var sp1 = ex(S, 'ParametricShadowSplit') / 100, sp2 = ex(S, 'ParametricMidtoneSplit') / 100, sp3 = ex(S, 'ParametricHighlightSplit') / 100;
+    var usePar = PS || PD || PL || PH, cS = sp1 / 2, cD = (sp1 + sp2) / 2, cL = (sp2 + sp3) / 2, cH = (sp3 + 1) / 2;
+    var stSh = ex(S, 'SplitToningShadowSaturation') / 100, stHi = ex(S, 'SplitToningHighlightSaturation') / 100, useSplit = stSh > 0 || stHi > 0;
+    var cSh = [0, 0, 0], cHi = [0, 0, 0], pivot = 0.5 + ex(S, 'SplitToningBalance') / 200;
+    if (useSplit) { hsv2rgb(ex(S, 'SplitToningShadowHue'), cSh); hsv2rgb(ex(S, 'SplitToningHighlightHue'), cHi); cSh = cSh.map(function (x) { return x - (0.2126 * cSh[0] + 0.7152 * cSh[1] + 0.0722 * cSh[2]); }); cHi = cHi.map(function (x) { return x - (0.2126 * cHi[0] + 0.7152 * cHi[1] + 0.0722 * cHi[2]); }); }
+    var vAmt = ex(S, 'PostCropVignetteAmount') / 100, useVig = !!width && vAmt !== 0, vMid = ex(S, 'PostCropVignetteMidpoint') / 100, vFe = ex(S, 'PostCropVignetteFeather') / 100;
+    var vH = width ? n / width : 1, vA0 = vMid * 0.9, vA1 = vA0 + vFe * 0.7 + 0.05;
     var tm = X.curveTable(S.curve), tr = X.curveTable(S.curveR), tg = X.curveTable(S.curveG), tb = X.curveTable(S.curveB);
     var gs = 1 + S.sat / 100, i, k, r, g, b;
-    var flat = S.hue.every(function (v) { return v === 0; }) && S.bsat.every(function (v) { return v === 0; });
+    var flat = !useLum && S.hue.every(function (v) { return v === 0; }) && S.bsat.every(function (v) { return v === 0; });
     var E = S.exposure || 0, CO = (S.contrast || 0) / 100, HI = (S.highlights || 0) / 100, SH = (S.shadows || 0) / 100, WH = (S.whites || 0) / 100, BL = (S.blacks || 0) / 100;
     var VI = (S.vibrance || 0) / 100, TE = (S.temp || 0) / 100, TI = (S.tint || 0) / 100;
-    var useWB = E !== 0 || TE !== 0 || TI !== 0, useTone = CO || HI || SH || WH || BL, useVib = VI !== 0;
+    var useWB = E !== 0 || TE !== 0 || TI !== 0, useTone = CO || HI || SH || WH || BL || usePar, useVib = VI !== 0;
     var gE = Math.pow(2, E), gR = gE * Math.pow(2, 0.5 * TE), gB = gE * Math.pow(2, -0.5 * TE), gG = gE * Math.pow(2, -0.3 * TI);
     for (i = 0; i < n; i++) {
       r = px[i * 4] / 255; g = px[i * 4 + 1] / 255; b = px[i * 4 + 2] / 255;
@@ -103,6 +135,7 @@
         dY += WH * 0.2 * ss01(0.55, 1, Y);
         dY += BL * 0.2 * (1 - ss01(0, 0.45, Y));
         dY -= CO * 0.16 * Math.sin(2 * Math.PI * Y);
+        if (usePar) { var gz = function (c) { var z = (Y - c) / 0.17; return Math.exp(-z * z); }; dY += 0.16 * (PS * gz(cS) + PD * gz(cD) + PL * gz(cL) + PH * gz(cH)); }
         r = clamp(r + dY, 0, 1); g = clamp(g + dY, 0, 1); b = clamp(b + dY, 0, 1);
       }
       if (useVib) {
@@ -118,14 +151,24 @@
         if (C > 1e-5) {
           var h = Math.atan2(lab[2], lab[1]) * 180 / Math.PI, dh = 0, f = 0;
           bandWeights(h, w);
-          for (k = 0; k < 8; k++) { dh += w[k] * S.hue[k]; f += w[k] * (1 + S.bsat[k] / 100); }
+          var dl = 0; for (k = 0; k < 8; k++) { dh += w[k] * S.hue[k]; f += w[k] * (1 + S.bsat[k] / 100); dl += w[k] * LU[k]; }
+          lab[0] = clamp(lab[0] + dl * 0.0022, 0, 1);
           var C2 = C * gs * f, h2 = (h + dh * 0.3) * Math.PI / 180;
           labToRgb(lab[0], C2 * Math.cos(h2), C2 * Math.sin(h2), rgb); r = rgb[0]; g = rgb[1]; b = rgb[2];
         }
       }
-      out[i * 4] = Math.round(look(tr, look(tm, r)) * 255);
-      out[i * 4 + 1] = Math.round(look(tg, look(tm, g)) * 255);
-      out[i * 4 + 2] = Math.round(look(tb, look(tm, b)) * 255);
+      r = look(tr, look(tm, r)); g = look(tg, look(tm, g)); b = look(tb, look(tm, b));
+      if (useSplit) {
+        var Y2 = 0.2126 * r + 0.7152 * g + 0.0722 * b, wh2 = ss01(pivot - 0.3, pivot + 0.3, Y2), ws = (1 - wh2) * stSh * 0.3, wi = wh2 * stHi * 0.3;
+        r = clamp(r + cSh[0] * ws + cHi[0] * wi, 0, 1); g = clamp(g + cSh[1] * ws + cHi[1] * wi, 0, 1); b = clamp(b + cSh[2] * ws + cHi[2] * wi, 0, 1);
+      }
+      if (useVig) {
+        var px_ = i % width, py_ = (i - px_) / width, dx = (px_ + 0.5) / width * 2 - 1, dy = (py_ + 0.5) / vH * 2 - 1, dd = Math.sqrt((dx * dx + dy * dy) / 2), vt = ss01(vA0, vA1, dd);
+        if (vAmt < 0) { var vf = 1 + vAmt * vt * 0.9; r *= vf; g *= vf; b *= vf; } else { var vw = vAmt * vt * 0.7; r += (1 - r) * vw; g += (1 - g) * vw; b += (1 - b) * vw; }
+      }
+      out[i * 4] = Math.round(r * 255);
+      out[i * 4 + 1] = Math.round(g * 255);
+      out[i * 4 + 2] = Math.round(b * 255);
       out[i * 4 + 3] = px[i * 4 + 3];
     }
     return out;
@@ -240,6 +283,18 @@
       if (p.length) bands.push(nm + ' ' + p.join(', '));
     });
     if (bands.length) out.push('Colour mixer: ' + bands.join('; '));
+    var lb = [];
+    X.BANDS.forEach(function (nm, i) { if (S.lum && S.lum[i]) lb.push(nm + ' ' + (S.lum[i] > 0 ? '+' : '') + S.lum[i]); });
+    if (lb.length) out.push('Colour brightness: ' + lb.join('; '));
+    var E = S.extra || {};
+    if (E.SplitToningShadowSaturation || E.SplitToningHighlightSaturation) out.push('Split toning (colour in the shadows and highlights)');
+    if (E.ParametricShadows || E.ParametricDarks || E.ParametricLights || E.ParametricHighlights) out.push('Parametric curve (shadows, darks, lights, highlights)');
+    if (E.PostCropVignetteAmount) out.push('Vignette ' + (E.PostCropVignetteAmount > 0 ? '+' : '') + E.PostCropVignetteAmount);
+    if (E.Clarity2012) out.push('Clarity ' + (E.Clarity2012 > 0 ? '+' : '') + E.Clarity2012);
+    if (E.Texture) out.push('Texture ' + (E.Texture > 0 ? '+' : '') + E.Texture);
+    if (E.Dehaze) out.push('Dehaze ' + (E.Dehaze > 0 ? '+' : '') + E.Dehaze);
+    if (E.GrainAmount) out.push('Grain ' + E.GrainAmount);
+    if (E.RedHue || E.RedSaturation || E.GreenHue || E.GreenSaturation || E.BlueHue || E.BlueSaturation || E.ShadowTint) out.push('Calibration (primary colours)');
     return out;
   };
 
@@ -257,9 +312,9 @@
   /* meta: {name, group, uuid} */
   X.write = function (S, meta) {
     var name = meta.name || 'Preset Lab look', attrs = [
-      'crs:PresetType="Normal"', 'crs:Cluster=""', 'crs:UUID="' + meta.uuid + '"', 'crs:SupportsAmount="False"', 'crs:SupportsColor="True"',
+      'crs:PresetType="Normal"', 'crs:Cluster="' + esc(meta.cluster || '') + '"', 'crs:UUID="' + meta.uuid + '"', 'crs:SupportsAmount="False"', 'crs:SupportsColor="True"',
       'crs:SupportsMonochrome="True"', 'crs:SupportsHighDynamicRange="True"', 'crs:SupportsNormalDynamicRange="True"', 'crs:SupportsSceneReferred="True"',
-      'crs:SupportsOutputReferred="True"', 'crs:CameraModelRestriction=""', 'crs:Copyright=""', 'crs:ContactInfo=""', 'crs:Version="11.1"', 'crs:ProcessVersion="11.0"'
+      'crs:SupportsOutputReferred="True"', 'crs:CameraModelRestriction=""', 'crs:Copyright="' + esc(meta.copyright || '') + '"', 'crs:ContactInfo="' + esc(meta.contact || '') + '"', 'crs:Version="11.1"', 'crs:ProcessVersion="11.0"'
     ];
     if (S.temp) attrs.push('crs:IncrementalTemperature="' + sgn(S.temp) + '"');
     if (S.tint) attrs.push('crs:IncrementalTint="' + sgn(S.tint) + '"');
@@ -273,12 +328,15 @@
     if (S.sat) attrs.push('crs:Saturation="' + sgn(S.sat) + '"');
     X.BANDS.forEach(function (n, i) { if (S.hue[i]) attrs.push('crs:HueAdjustment' + n + '="' + sgn(S.hue[i]) + '"'); });
     X.BANDS.forEach(function (n, i) { if (S.bsat[i]) attrs.push('crs:SaturationAdjustment' + n + '="' + sgn(S.bsat[i]) + '"'); });
+    X.BANDS.forEach(function (n, i) { if (S.lum && S.lum[i]) attrs.push('crs:LuminanceAdjustment' + n + '="' + sgn(S.lum[i]) + '"'); });
+    X.EXTRA_SIGNED.forEach(function (k) { var v = S.extra && S.extra[k]; if (v) attrs.push('crs:' + k + '="' + sgn(v) + '"'); });
+    X.EXTRA_PLAIN.forEach(function (k) { var v = S.extra && S.extra[k]; if (v !== undefined && v !== (EXTRA_DEF[k] || 0)) attrs.push('crs:' + k + '="' + v + '"'); });
     var curves = !isIdCurve(S.curve) || !isIdCurve(S.curveR) || !isIdCurve(S.curveG) || !isIdCurve(S.curveB);
     if (curves) attrs.push('crs:ToneCurveName2012="Custom"');
     attrs.push('crs:HasSettings="True"');
     var s = '<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="' + XMPTK + '">\n <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n  <rdf:Description rdf:about=""\n    xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"\n' +
       attrs.map(function (a) { return '   ' + a; }).join('\n') + '>\n';
-    s += alt('Name', name) + alt('ShortName', '') + alt('SortName', '') + alt('Group', meta.group || '') + alt('Description', 'Made with Preset Lab by Zero3');
+    s += alt('Name', name) + alt('ShortName', '') + alt('SortName', '') + alt('Group', meta.group || '') + alt('Description', meta.description || 'Made with Preset Lab by Zero3');
     if (curves) {
       s += curveXml('ToneCurvePV2012', S.curve) + curveXml('ToneCurvePV2012Red', S.curveR) + curveXml('ToneCurvePV2012Green', S.curveG) + curveXml('ToneCurvePV2012Blue', S.curveB);
     }
@@ -293,6 +351,8 @@
     S.sat = num('Saturation'); S.vibrance = num('Vibrance'); S.temp = num('IncrementalTemperature'); S.tint = num('IncrementalTint');
     S.exposure = num('Exposure2012'); S.contrast = num('Contrast2012'); S.highlights = num('Highlights2012'); S.shadows = num('Shadows2012'); S.whites = num('Whites2012'); S.blacks = num('Blacks2012');
     X.BANDS.forEach(function (n, i) { S.hue[i] = num('HueAdjustment' + n); S.bsat[i] = num('SaturationAdjustment' + n); });
+    X.BANDS.forEach(function (n, i) { S.lum[i] = num('LuminanceAdjustment' + n); });
+    X.EXTRA_SIGNED.concat(X.EXTRA_PLAIN).forEach(function (k) { var r = new RegExp('crs:' + k + '="([-+]?[0-9.]+)"').exec(text); if (r) S.extra[k] = parseFloat(r[1]); });
     function curve(tag) {
       var r = new RegExp('<crs:' + tag + '>\\s*<rdf:Seq>([\\s\\S]*?)</rdf:Seq>').exec(text);
       if (!r) return X.curveIdentity();
@@ -321,7 +381,7 @@
     });
     if (stack.length) p.push('unclosed tag ' + stack[stack.length - 1]);
     if (/[<>]/.test(rest)) p.push('stray angle bracket');
-    var ranges = /crs:(Saturation|Vibrance|IncrementalTemperature|IncrementalTint|Contrast2012|Highlights2012|Shadows2012|Whites2012|Blacks2012|HueAdjustment\w+|SaturationAdjustment\w+)="([^"]*)"/g;
+    var ranges = /crs:(Saturation|Vibrance|IncrementalTemperature|IncrementalTint|Contrast2012|Highlights2012|Shadows2012|Whites2012|Blacks2012|HueAdjustment\w+|SaturationAdjustment\w+|LuminanceAdjustment\w+|Texture|Clarity2012|Dehaze)="([^"]*)"/g;
     while ((m = ranges.exec(text))) { var v = Number(m[2]); if (!/^[-+]?\d+$/.test(m[2]) || v < -100 || v > 100) p.push(m[1] + ' is out of range: ' + m[2]); }
     var ex = /crs:Exposure2012="([^"]*)"/.exec(text);
     if (ex && (!/^[-+]?\d+(\.\d+)?$/.test(ex[1]) || Math.abs(Number(ex[1])) > 5)) p.push('Exposure2012 is out of range: ' + ex[1]);
@@ -330,7 +390,6 @@
       var pts = [], re = /<rdf:li>\s*(\d+)\s*,\s*(\d+)\s*<\/rdf:li>/g, q;
       while ((q = re.exec(m[2]))) pts.push([+q[1], +q[2]]);
       if (pts.length < 2) { p.push(m[1] + ' has fewer than 2 points'); continue; }
-      if (pts[0][0] !== 0 || pts[pts.length - 1][0] !== 255) p.push(m[1] + ' does not run from 0 to 255');
       for (var i = 0; i < pts.length; i++) {
         if (pts[i][0] > 255 || pts[i][1] > 255) p.push(m[1] + ' has a point above 255');
         if (i && pts[i][0] <= pts[i - 1][0]) p.push(m[1] + ' x values are not rising');
