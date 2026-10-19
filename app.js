@@ -7,19 +7,32 @@
   var st = { proxy: null, fast: false, fid: 0, derivedKey: '', derived: null, lib: null, curveOv: null, man: {}, file: null, foot: null, ref: null, settings: null, graded: null, split: 0.5 };
 
   /* ---------- images ---------- */
-  function toImageData(bmp, maxW) {
-    var w = bmp.width, h = bmp.height, s = Math.min(1, maxW / w);
-    var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
-    var x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(bmp, 0, 0, c.width, c.height);
+  function toImageData(bmp, maxW, orient) {
+    var w = bmp.width, h = bmp.height, s = Math.min(1, maxW / w), o = orient || 1, sw = Math.max(1, Math.round(w * s)), sh = Math.max(1, Math.round(h * s));
+    var c = document.createElement('canvas'), swap = o >= 5; c.width = swap ? sh : sw; c.height = swap ? sw : sh;
+    var x = c.getContext('2d', { willReadFrequently: true });
+    var T = { 2: [-1, 0, 0, 1, sw, 0], 3: [-1, 0, 0, -1, sw, sh], 4: [1, 0, 0, -1, 0, sh], 5: [0, 1, 1, 0, 0, 0], 6: [0, 1, -1, 0, sh, 0], 7: [0, -1, -1, 0, sh, sw], 8: [0, -1, 1, 0, 0, sw] }[o];
+    if (T) x.setTransform(T[0], T[1], T[2], T[3], T[4], T[5]);
+    x.drawImage(bmp, 0, 0, sw, sh);
     return x.getImageData(0, 0, c.width, c.height);
   }
-  function readImage(file, maxW) {
+  function loadBlobImage(blob, maxW, orient, note) {
     return new Promise(function (res, rej) {
-      var url = URL.createObjectURL(file), im = new Image();
-      im.onload = function () { try { res(toImageData(im, maxW)); } catch (e) { rej(e); } URL.revokeObjectURL(url); };
+      var url = URL.createObjectURL(blob), im = new Image();
+      im.onload = function () { try { var d = toImageData(im, maxW, orient); d.fromRaw = note; res(d); } catch (e) { rej(e); } URL.revokeObjectURL(url); };
       im.onerror = function () { URL.revokeObjectURL(url); rej(new Error('That file did not open as a picture.')); };
       im.src = url;
     });
+  }
+  function readImage(file, maxW) {
+    if (window.RAWX && RAWX.isRaw(file.name)) {
+      return file.arrayBuffer().then(function (buf) {
+        var b = new Uint8Array(buf), p = RAWX.pick(b);
+        if (!p) throw new Error('I could not find a preview picture inside that RAW file. Some older cameras do not store one. Save a JPG or TIFF from your RAW editor and use that.');
+        return loadBlobImage(new Blob([b.subarray(p.start, p.start + p.length)], { type: 'image/jpeg' }), maxW, p.orient, true);
+      });
+    }
+    return loadBlobImage(file, maxW, 1, false);
   }
   function sampleImage() {
     var c = document.createElement('canvas'); c.width = MAXW; c.height = 540;
@@ -199,22 +212,22 @@
   /* ---------- inputs ---------- */
   $('footBtn').onclick = function () { $('footFile').click(); };
   $('footFile').onchange = function () { loadFoot($('footFile').files[0]); $('footFile').value = ''; };
-  $('sampleBtn').onclick = function () { setFoot(sampleImage(), 'Showing the sample picture. Drop an image here, or use the button.'); };
-  function loadFoot(f) { if (!f) return; readImage(f, MAXW).then(function (img) { setFoot(img, 'Your photo: ' + f.name, f); }).catch(function (e) { say(e.message, 'err'); }); }
+  $('sampleBtn').onclick = function () { setFoot(sampleImage(), 'Showing the sample picture. Drop a photo or RAW file here, or use the button.'); };
+  function loadFoot(f) { if (!f) return; $('footNote').textContent = 'Opening ' + f.name + '...'; readImage(f, MAXW).then(function (img) { setFoot(img, 'Your photo: ' + f.name + (img.fromRaw ? ' (the preview picture stored inside the RAW file)' : ''), f); }).catch(function (e) { $('footNote').textContent = e.message; }); }
   var stage = $('stage');
   ['dragenter', 'dragover'].forEach(function (ev) { stage.addEventListener(ev, function (e) { e.preventDefault(); stage.classList.add('drop'); }); });
   ['dragleave', 'drop'].forEach(function (ev) { stage.addEventListener(ev, function (e) { e.preventDefault(); stage.classList.remove('drop'); }); });
-  stage.addEventListener('drop', function (e) { var f = e.dataTransfer && e.dataTransfer.files[0]; if (f && /^image\//.test(f.type)) loadFoot(f); });
+  stage.addEventListener('drop', function (e) { var f = e.dataTransfer && e.dataTransfer.files[0]; if (f && (/^image\//.test(f.type) || (window.RAWX && RAWX.isRaw(f.name)))) loadFoot(f); });
 
   $('refBtn').onclick = function () { $('refFile').click(); };
   $('refFile').onchange = function () {
     var f = $('refFile').files[0]; $('refFile').value = ''; if (!f) return;
-    readImage(f, 600).then(function (img) {
-      st.ref = img; st.fid++;
+    $('refMsg').textContent = ''; readImage(f, 600).then(function (img) {
+      st.ref = img; $('refMsg').textContent = img.fromRaw ? 'Used the preview picture stored inside the RAW file.' : ''; st.fid++;
       var c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').putImageData(img, 0, 0);
       var t = $('refThumb'); t.src = c.toDataURL('image/jpeg', 0.8); t.hidden = false;
       $('refBtn').textContent = 'Change reference photo'; refresh();
-    }).catch(function (e) { say(e.message, 'err'); });
+    }).catch(function (e) { $('refMsg').textContent = e.message; });
   };
   [['pTone', 'pToneVal'], ['pColour', 'pColourVal'], ['pDetail', 'pDetailVal']].forEach(function (p) {
     $(p[0]).oninput = function () { $(p[1]).textContent = (+$(p[0]).value).toFixed(2); refresh(); };
@@ -251,7 +264,7 @@
   $('dlPic').onclick = function () {
     if (!st.settings) return;
     var btn = $('dlPic'); btn.disabled = true; picSay('Working on the full size picture...');
-    var settings = st.settings, fmt = $('picFmt').value, base = cleanName();
+    var settings = st.settings, fmt = $('picFmt').value, base = cleanName(), isRawFile = !!(st.file && window.RAWX && RAWX.isRaw(st.file.name));
     setTimeout(function () {
       fullImage().then(function (img) {
         if (img.width * img.height > MAX_PIXELS) throw new Error('That photo is too large to edit in the browser (over 60 megapixels). Use a smaller export of it.');
@@ -265,7 +278,7 @@
         var url = URL.createObjectURL(r.blob), a = document.createElement('a');
         a.href = url; a.download = base + ' edited.' + fmt; document.body.appendChild(a); a.click(); a.remove();
         setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-        picSay('Saved ' + r.w + ' x ' + r.h + ' ' + fmt.toUpperCase() + '. This is the tool\'s own preview, so Lightroom may differ slightly.', 'ok');
+        picSay('Saved ' + r.w + ' x ' + r.h + ' ' + fmt.toUpperCase() + '.' + (isRawFile ? ' For a RAW file this is the size of the preview picture inside it, not the full sensor size.' : '') + ' This is the tool\'s own preview, so Lightroom may differ slightly.', 'ok');
       }).catch(function (e) { picSay(e.message || 'Could not save the picture.', 'err'); }).then(function () { btn.disabled = !st.settings; });
     }, 30);
   };
@@ -308,5 +321,5 @@
   } else $('libCard').hidden = true;
 
   window.PRESET_STATE = st; // for checking in the console
-  setFoot(sampleImage(), 'Showing the sample picture. Drop an image here, or use the button.');
+  setFoot(sampleImage(), 'Showing the sample picture. Drop a photo or RAW file here, or use the button.');
 })();
