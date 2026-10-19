@@ -4,7 +4,7 @@
   var cv = $('cv'), ctx = cv.getContext('2d');
   var MAXW = 960;
 
-  var st = { proxy: null, fast: false, fid: 0, derivedKey: '', derived: null, curveOv: null, man: {}, file: null, foot: null, ref: null, settings: null, graded: null, split: 0.5 };
+  var st = { proxy: null, fast: false, fid: 0, derivedKey: '', derived: null, lib: null, curveOv: null, man: {}, file: null, foot: null, ref: null, settings: null, graded: null, split: 0.5 };
 
   /* ---------- images ---------- */
   function toImageData(bmp, maxW) {
@@ -69,14 +69,14 @@
       var tx = document.createElement('span'); tx.textContent = text; li.appendChild(k); li.appendChild(tx); ul.appendChild(li);
     }
     if (!st.foot) { st.settings = null; st.graded = null; $('dl').disabled = true; $('dlPic').disabled = true; draw(); return; }
-    var o = opts(), key = st.fid + '|' + JSON.stringify(o) + '|' + (st.ref ? 1 : 0);
-    if (key !== st.derivedKey) { st.fast = false; st.derived = st.ref ? XMP.derive(st.foot.data, st.ref.data, o) : XMP.identity(); st.derivedKey = key; }
+    var o = opts(), key = st.fid + '|' + (st.lib ? 'L' + st.lib.i : JSON.stringify(o) + '|' + (st.ref ? 1 : 0));
+    if (key !== st.derivedKey) { st.fast = false; st.derived = st.lib ? XMP.fromPreset(st.lib) : st.ref ? XMP.derive(st.foot.data, st.ref.data, o) : XMP.identity(); st.derivedKey = key; }
     var S = JSON.parse(JSON.stringify(st.derived));
-    TUNE.forEach(function (t) { var v = st.man[t.id] || 0; if (t.id === 'sat') S.sat = Math.max(-100, Math.min(100, S.sat + v)); else S[t.id] = v; });
+    TUNE.forEach(function (t) { var v = st.man[t.id] || 0; var lim = t.id === 'exposure' ? 5 : 100; S[t.id] = Math.max(-lim, Math.min(lim, (S[t.id] || 0) + v)); });
     if (st.curveOv) S.curve = st.curveOv.map(function (p) { return p.slice(); });
     st.settings = S;
     var srcImg = (st.fast && key === st.derivedKey && st.proxy) ? st.proxy : st.foot;
-    st.graded = new ImageData(XMP.render(srcImg.data, S), srcImg.width, srcImg.height);
+    st.graded = new ImageData(XMP.render(srcImg.data, S, srcImg.width), srcImg.width, srcImg.height);
     var d = XMP.describe(S), any = d.length > 0;
     $('empty').textContent = (!st.ref && !any) ? 'Choose a reference photo, or move a slider, to see the change.' : '';
     $('dl').disabled = !any; $('dlPic').disabled = !any;
@@ -86,6 +86,11 @@
     if (!any) row('info', 'Note', st.ref ? 'These two photos already look alike, so the preset changes almost nothing.' : 'Nothing set yet. Choose a reference photo or move a slider.');
     var d = XMP.describe(st.settings);
     d.forEach(function (t) { row('ok', 'Sets', t); });
+    var np = []; var E = S.extra || {};
+    if (E.Clarity2012) np.push('Clarity'); if (E.Texture) np.push('Texture'); if (E.Dehaze) np.push('Dehaze'); if (E.GrainAmount) np.push('Grain');
+    if (E.RedHue || E.RedSaturation || E.GreenHue || E.GreenSaturation || E.BlueHue || E.BlueSaturation || E.ShadowTint) np.push('Calibration');
+    if (np.length) row('info', 'Not in preview', np.join(', ') + ' are written into the file, but the preview here does not draw them. Check them in Lightroom.');
+    if (st.lib && st.lib.mk) row('info', 'Note', 'The original preset also had a local mask. Masks are not copied, so this version leaves it out.');
     row('info', 'Leaves', 'Anything not listed above (sharpening, noise, masks, crop, profile, Color Grading wheels) stays as it is on the photo you apply it to.');
     draw();
   }
@@ -222,11 +227,11 @@
   $('dl').onclick = function () {
     if (!st.settings) return;
     var bytes = new Uint8Array(16); (window.crypto || window.msCrypto).getRandomValues(bytes);
-    var text = XMP.write(st.settings, { name: cleanName(), group: cleanGroup(), uuid: XMP.uuid(bytes) });
+    var text = XMP.write(st.settings, { name: cleanName(), group: cleanGroup(), uuid: XMP.uuid(bytes), copyright: st.lib && st.lib.k, contact: st.lib && st.lib.ci, cluster: st.lib && st.lib.cl });
     var problems = XMP.validate(text);
     var doc = new DOMParser().parseFromString(text, 'application/xml');
     if (doc.getElementsByTagName('parsererror').length) problems.push('the browser could not read it as XML');
-    var back = XMP.read(text), a = XMP.render(st.foot.data, st.settings), b = XMP.render(st.foot.data, back), m = 0;
+    var back = XMP.read(text), a = XMP.render(st.foot.data, st.settings, st.foot.width), b = XMP.render(st.foot.data, back, st.foot.width), m = 0;
     for (var i = 0; i < a.length; i++) { var d = Math.abs(a[i] - b[i]); if (d > m) m = d; }
     if (m > 1) problems.push('the file gives a different picture from the preview (largest difference ' + m + ' of 255)');
     if (problems.length) { say('Not saved. ' + problems.join('; ') + '.', 'err'); return; }
@@ -250,7 +255,7 @@
     setTimeout(function () {
       fullImage().then(function (img) {
         if (img.width * img.height > MAX_PIXELS) throw new Error('That photo is too large to edit in the browser (over 60 megapixels). Use a smaller export of it.');
-        var out = new ImageData(XMP.render(img.data, settings), img.width, img.height);
+        var out = new ImageData(XMP.render(img.data, settings, img.width), img.width, img.height);
         var c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
         c.getContext('2d').putImageData(out, 0, 0);
         return new Promise(function (res, rej) {
@@ -264,6 +269,43 @@
       }).catch(function (e) { picSay(e.message || 'Could not save the picture.', 'err'); }).then(function () { btn.disabled = !st.settings; });
     }, 30);
   };
+
+  /* ---------- built-in library ---------- */
+  var LIB = window.PRESETS || [], libGroup = 'All', libQ = '';
+  var GROUPS = ['All', 'Warm', 'Cool', 'Vivid', 'Muted', 'Matte', 'Moody', 'Bright', 'Contrast', 'Split Tone', 'Film', 'Black and White', 'Neutral'];
+  function drawLib() {
+    var box = $('libList'); box.innerHTML = ''; var q = libQ.toLowerCase(), n = 0;
+    LIB.forEach(function (p) {
+      if (libGroup !== 'All' && p.g !== libGroup) return;
+      if (q && (p.n + ' ' + p.g).toLowerCase().indexOf(q) < 0) return;
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'libitem' + (st.lib === p ? ' on' : ''); b.setAttribute('role', 'option');
+      b.textContent = p.n; var sm = document.createElement('small'); sm.textContent = p.g; b.appendChild(sm);
+      b.onclick = function () { pickLib(p); }; box.appendChild(b); n++;
+    });
+    if (!n) { var d = document.createElement('div'); d.className = 'libnone'; d.textContent = 'No preset matches that.'; box.appendChild(d); }
+    $('libCount').textContent = n === LIB.length ? '(' + LIB.length + ')' : '(' + n + ' of ' + LIB.length + ')';
+  }
+  function pickLib(p) {
+    st.lib = p; st.curveOv = null; st.man = {};
+    TUNE.forEach(function (t) { $('m_' + t.id).value = 0; $('mv_' + t.id).textContent = '0'; });
+    $('name').value = p.n; $('group').value = p.g;
+    $('libPick').hidden = false; $('libName').textContent = p.n; $('libGrp').textContent = p.g;
+    var cr = $('libCredit'), t = [p.k, p.ci].filter(Boolean).join(' - ');
+    cr.hidden = !t; cr.textContent = t ? 'Credit kept in the file: ' + t : '';
+    drawLib(); refresh();
+  }
+  $('libClear').onclick = function () { st.lib = null; st.curveOv = null; $('libPick').hidden = true; drawLib(); refresh(); };
+  if (LIB.length) {
+    var ch = $('libChips'), have = {}; LIB.forEach(function (p) { have[p.g] = 1; });
+    GROUPS.forEach(function (g) {
+      if (g !== 'All' && !have[g]) return;
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (g === libGroup ? ' on' : ''); b.textContent = g;
+      b.onclick = function () { libGroup = g; Array.prototype.forEach.call(ch.children, function (c) { c.className = 'chip' + (c.textContent === g ? ' on' : ''); }); drawLib(); };
+      ch.appendChild(b);
+    });
+    $('libQ').oninput = function () { libQ = this.value; drawLib(); };
+    drawLib();
+  } else $('libCard').hidden = true;
 
   window.PRESET_STATE = st; // for checking in the console
   setFoot(sampleImage(), 'Showing the sample picture. Drop an image here, or use the button.');
