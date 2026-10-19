@@ -24,15 +24,50 @@
       im.src = url;
     });
   }
-  function readImage(file, maxW) {
-    if (window.RAWX && RAWX.isRaw(file.name)) {
-      return file.arrayBuffer().then(function (buf) {
-        var b = new Uint8Array(buf), p = RAWX.pick(b);
-        if (!p) throw new Error('I could not find a preview picture inside that RAW file. Some older cameras do not store one. Save a JPG or TIFF from your RAW editor and use that.');
-        return loadBlobImage(new Blob([b.subarray(p.start, p.start + p.length)], { type: 'image/jpeg' }), maxW, p.orient, true);
+  function decodeEl(blob) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(blob), im = new Image();
+      im.onload = function () { URL.revokeObjectURL(url); res(im); };
+      im.onerror = function () { URL.revokeObjectURL(url); rej(new Error('decode')); };
+      im.src = url;
+    });
+  }
+  /* Find the best picture inside a camera RAW file. Tries the biggest embedded JPEGs the browser can open and keeps the one with the most pixels. */
+  function readRaw(file, maxW) {
+    return file.arrayBuffer().then(function (buf) {
+      var b = new Uint8Array(buf), list = RAWX.previews(b).slice(0, 6), best = null, i = 0;
+      function fromSensor(why) {
+        var d = RAWX.decodeBayer(b);
+        if (d && !d.error) {
+          var c = document.createElement('canvas'); c.width = d.width; c.height = d.height;
+          c.getContext('2d').putImageData(new ImageData(d.data, d.width, d.height), 0, 0);
+          var out = toImageData(c, maxW, d.orient); out.fromRaw = true; out.decoded = true; return out;
+        }
+        if (d && d.error === 'compressed') throw new Error('This RAW file has no preview picture and its sensor data is stored in a compressed form I cannot open yet. Open it in your RAW editor, save a JPG or TIFF, and use that.');
+        throw new Error(why);
+      }
+      if (!list.length) return fromSensor('This file has no preview picture inside it and I could not read its sensor data, so I cannot show it. Open it in your RAW editor, save a JPG or TIFF, and use that.');
+      function next() {
+        if (i >= list.length) return Promise.resolve();
+        var c = list[i++];
+        return decodeEl(new Blob([b.subarray(c.start, c.start + c.length)], { type: 'image/jpeg' })).then(function (im) {
+          var area = im.naturalWidth * im.naturalHeight;
+          if (!best || area > best.area) best = { im: im, area: area, start: c.start };
+        }, function () {}).then(next);
+      }
+      return next().then(function () {
+        if (!best) return fromSensor('This file has picture data inside it, but the browser could not open any of it. Save a JPG from your RAW editor and use that instead.');
+        var d = toImageData(best.im, maxW, RAWX.orientFor(b, best.start)); d.fromRaw = true; return d;
       });
-    }
-    return loadBlobImage(file, maxW, 1, false);
+    });
+  }
+  function readImage(file, maxW) {
+    var byName = window.RAWX && RAWX.isRaw(file.name), byType = /dng|raw|tiff?$/i.test(file.type || '');
+    if (byName) return readRaw(file, maxW);
+    return loadBlobImage(file, maxW, 1, false).catch(function (e) {
+      if (byType || !file.type || file.type === 'application/octet-stream' || /tiff?|dng|raw/i.test(file.type)) return readRaw(file, maxW);
+      throw e;
+    });
   }
   function sampleImage() {
     var c = document.createElement('canvas'); c.width = MAXW; c.height = 540;
@@ -218,7 +253,7 @@
   $('footRawBtn').onclick = function () { $('footRaw').click(); };
   $('footRaw').onchange = function () { loadFoot($('footRaw').files[0]); $('footRaw').value = ''; };
   $('sampleBtn').onclick = function () { setFoot(sampleImage(), 'Showing the sample picture. Drop a photo or RAW file here, or use the button.'); };
-  function loadFoot(f) { if (!f) return; $('footNote').textContent = 'Opening ' + f.name + '...'; readImage(f, MAXW).then(function (img) { setFoot(img, 'Your photo: ' + f.name + (img.fromRaw ? ' (the preview picture stored inside the RAW file)' : ''), f); }).catch(function (e) { $('footNote').textContent = e.message; }); }
+  function loadFoot(f) { if (!f) return; $('footNote').style.color = ''; $('footNote').textContent = 'Opening ' + f.name + '...'; readImage(f, MAXW).then(function (img) { setFoot(img, 'Your photo: ' + f.name + (img.decoded ? ' (read from the RAW sensor data at half size, plain automatic colour)' : img.fromRaw ? ' (the preview picture stored inside the RAW file)' : ''), f); }).catch(function (e) { $('footNote').style.color = '#ff8a8a'; $('footNote').textContent = e.message; }); }
   var stage = $('stage');
   ['dragenter', 'dragover'].forEach(function (ev) { stage.addEventListener(ev, function (e) { e.preventDefault(); stage.classList.add('drop'); }); });
   ['dragleave', 'drop'].forEach(function (ev) { stage.addEventListener(ev, function (e) { e.preventDefault(); stage.classList.remove('drop'); }); });
@@ -229,7 +264,7 @@
   $('refFile').onchange = $('refRaw').onchange = function () {
     var inp = this, f = inp.files[0]; inp.value = ''; if (!f) return;
     $('refMsg').textContent = ''; readImage(f, 600).then(function (img) {
-      st.ref = img; $('refMsg').textContent = img.fromRaw ? 'Used the preview picture stored inside the RAW file.' : ''; st.fid++;
+      st.ref = img; $('refMsg').textContent = img.decoded ? 'Read from the RAW sensor data at half size.' : img.fromRaw ? 'Used the preview picture stored inside the RAW file.' : ''; st.fid++;
       var c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').putImageData(img, 0, 0);
       var t = $('refThumb'); t.src = c.toDataURL('image/jpeg', 0.8); t.hidden = false;
       $('refBtn').textContent = 'Change reference photo'; refresh();
