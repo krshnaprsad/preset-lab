@@ -73,5 +73,31 @@ const clean = X.derive(src, ref, { tone: 1, colour: 1, detail: 0, keepClean: tru
 ok(clean.curve[0][1] === 0 && clean.curve[clean.curve.length - 1][1] === 255, 'clean blacks and whites pinned');
 ok(D.hue.every(v => Math.abs(v) <= 30) && D.bsat.every(v => Math.abs(v) <= 40) && Math.abs(D.sat) <= 60, 'values stay in safe ranges');
 
+
+// manual adjustments
+function adj(o) { const S = X.identity(); Object.assign(S, o); return S; }
+const grey = pics(7, (a) => { const v = a * 255; return [v, v, v]; });
+const dark = pics(8, (a) => { const v = a * 60; return [v, v, v]; }), light = pics(9, (a) => { const v = 195 + a * 60; return [v, v, v]; });
+ok(mean(X.render(grey, adj({ exposure: 1 })), 1) > mean(grey, 1) + 20, 'exposure up brightens');
+ok(mean(X.render(grey, adj({ exposure: -1 })), 1) < mean(grey, 1) - 20, 'exposure down darkens');
+const cH = X.render(grey, adj({ contrast: 60 }));
+ok(mean(X.render(dark, adj({ contrast: 60 })), 1) < mean(dark, 1) && mean(X.render(light, adj({ contrast: 60 })), 1) > mean(light, 1), 'contrast pushes darks down and lights up');
+ok(mean(X.render(dark, adj({ shadows: 80 })), 1) > mean(dark, 1) + 5 && Math.abs(mean(X.render(light, adj({ shadows: 80 })), 1) - mean(light, 1)) < 3, 'shadows lift darks only');
+ok(mean(X.render(light, adj({ highlights: -80 })), 1) < mean(light, 1) - 5 && Math.abs(mean(X.render(dark, adj({ highlights: -80 })), 1) - mean(dark, 1)) < 3, 'highlights pull lights only');
+ok(mean(X.render(light, adj({ whites: 80 })), 1) >= mean(light, 1) && mean(X.render(dark, adj({ blacks: -80 })), 1) < mean(dark, 1), 'whites and blacks move their ends');
+const warmed = X.render(grey, adj({ temp: 60 })); ok(mean(warmed, 0) > mean(warmed, 2) + 5, 'temperature up is warmer');
+const tinted = X.render(grey, adj({ tint: 60 })); ok(mean(tinted, 1) < mean(tinted, 0) - 3, 'tint up is more magenta');
+const dull = pics(10, () => [120, 110, 100]), vivid = pics(11, () => [230, 40, 30]);
+const spread = (p) => Math.abs(mean(p, 0) - mean(p, 2));
+ok(spread(X.render(dull, adj({ vibrance: 80 }))) / spread(dull) > spread(X.render(vivid, adj({ vibrance: 80 }))) / spread(vivid) + 0.15, 'vibrance helps dull colours more');
+const all = adj({ exposure: 0.8, contrast: 15, highlights: -30, shadows: 25, whites: 10, blacks: -10, vibrance: 20, temp: 10, tint: -6, sat: 8, curve: [[0, 0], [100, 90], [255, 255]] });
+const allBack = X.read(X.write(all, { name: 'x', uuid: uuid() }));
+ok(maxDiff(X.render(photo, all), X.render(photo, allBack)) <= 1, 'manual settings survive the file round trip');
+ok(X.validate(X.write(all, { name: 'x', uuid: uuid() })).length === 0, 'manual preset is valid');
+ok(/crs:Exposure2012="\+0\.80"/.test(X.write(all, { name: 'x', uuid: uuid() })) && /crs:IncrementalTint="-6"/.test(X.write(all, { name: 'x', uuid: uuid() })), 'Adobe names used');
+ok(X.validate(X.write(adj({ exposure: 0.5 }), { name: 'x', uuid: uuid() }).replace('+0.50', '+7.00')).length > 0, 'exposure out of range caught');
+ok(X.validate(X.write(adj({ contrast: 30 }), { name: 'x', uuid: uuid() }).replace('"+30"', '"+300"')).length > 0, 'contrast out of range caught');
+ok(maxDiff(X.render(photo, X.identity()), photo) <= 1, 'identity still untouched');
+
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
