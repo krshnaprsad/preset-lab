@@ -16,13 +16,19 @@ Three sliders: Match brightness (the light and dark balance), Match colour (tint
 
 On top of the match there is a Fine tune section: Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Temperature, Tint, Vibrance and Saturation, plus a tone curve you can drag. It works without a reference photo too, so you can use it as a plain preset maker. Everything you set goes into the .xmp file and into the edited picture.
 
+## The built-in presets
+
+There are 340 built-in presets you can pick from instead of using a reference photo. They come from a pack I have the licence to use. I did not name them by hand: each name is worked out from the preset's own settings (warm or cool, vivid or muted, matte, punchy, split toning and so on), and there are filter buttons for those groups. Where a preset carries a credit in its file (51 from Adobe, 3 from Sergey Zhmakin, 3 from 2000px Media), that credit text is kept in the file you download.
+
+Pick one and it is applied to your photo, then you can still change it in Fine tune. The preview draws exposure, tone, white balance, saturation, the colour mixer (hue, saturation and brightness), the tone curves, split toning, the parametric curve and vignette. Clarity, Texture, Dehaze, Grain and Calibration are written into the file but the preview does not draw them, and the page says so when a preset uses them. One preset also had a local mask in the original. Masks are not copied, so that one is the version without it.
+
 ## What goes into the preset
 
 - A tone curve, built by matching the light and dark balance of the two photos, or one you shaped by hand.
 - Your Fine tune settings: Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Vibrance, and relative Temperature and Tint (the kind Lightroom uses for JPEGs and other non-raw photos).
 - Red, green and blue curves, which carry the colour tint of the reference in your shadows, mids and highlights.
 - Overall Saturation.
-- The colour mixer: Hue and Saturation for the eight colours (red, orange, yellow, green, aqua, blue, purple, magenta).
+- The colour mixer: Hue and Saturation for the eight colours (red, orange, yellow, green, aqua, blue, purple, magenta). Built-in presets also use Luminance for those colours.
 
 You can also save the edited picture itself (PNG lossless, or JPG at top quality) at the native pixel size of the photo you loaded. That is the tool's own preview maths, so it may differ slightly from Lightroom. The preset file is the one to trust in Lightroom.
 
@@ -36,7 +42,7 @@ Adobe says Lightroom Classic 8.2 and earlier cannot import .xmp presets.
 
 ## What it cannot do
 
-- It cannot copy masks, local edits, crops, grain or camera profiles.
+- From a reference photo it cannot copy masks, local edits, crops, grain or camera profiles. Built-in presets keep their grain but not masks, sharpening, noise reduction, lens or profile settings.
 - It cannot read the real settings of the reference photo. It only sees the picture, so the preset is an estimate of the look.
 - The match itself does not set Exposure, Contrast or White Balance. The curves carry the tone and tint instead, so the match does not fight with the exposure of whatever photo you apply it to. Those only change if you move the Fine tune sliders. Sharpening, noise, grain and the Color Grading wheels are not covered.
 - The hand-drawn curve cannot go backwards (a point cannot sit lower than the point before it), so inverted curves are not possible.
@@ -44,7 +50,7 @@ Adobe says Lightroom Classic 8.2 and earlier cannot import .xmp presets.
 
 ## How I checked it
 
-`npm test` runs 46 checks. They cover the curve maths, writing and reading the file, a validity check on the XMP (namespaces, the id, value ranges, curve order, balanced tags), names with odd characters, what each Fine tune slider does to dark and light areas, and that a brighter, warmer reference moves a photo the right way. A photo matched against itself comes out unchanged.
+`npm test` runs 54 checks. They cover the 340 built-in presets (each writes a valid file, keeps its credit text, and reads back to the same picture), the curve maths, writing and reading the file, a validity check on the XMP (namespaces, the id, value ranges, curve order, balanced tags), names with odd characters, what each Fine tune slider does to dark and light areas, and that a brighter, warmer reference moves a photo the right way. A photo matched against itself comes out unchanged.
 
 Every time you press Download, the page also reads the file back and checks that it gives the same picture as the preview.
 
