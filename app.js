@@ -4,7 +4,7 @@
   var cv = $('cv'), ctx = cv.getContext('2d');
   var MAXW = 960;
 
-  var st = { proxy: null, fast: false, fid: 0, derivedKey: '', derived: null, lib: null, curveOv: null, man: {}, file: null, foot: null, ref: null, settings: null, graded: null, split: 0.5 };
+  var st = { proxy: null, fast: false, fid: 0, derivedKey: '', derived: null, lib: null, strength: 1, curveOv: null, man: {}, file: null, foot: null, ref: null, settings: null, graded: null, split: 0.5 };
 
   /* ---------- images ---------- */
   function toImageData(bmp, maxW, orient) {
@@ -84,7 +84,7 @@
     if (!st.foot) { st.settings = null; st.graded = null; $('dl').disabled = true; $('dlPic').disabled = true; draw(); return; }
     var o = opts(), key = st.fid + '|' + (st.lib ? 'L' + st.lib.i : JSON.stringify(o) + '|' + (st.ref ? 1 : 0));
     if (key !== st.derivedKey) { st.fast = false; st.derived = st.lib ? XMP.fromPreset(st.lib) : st.ref ? XMP.derive(st.foot.data, st.ref.data, o) : XMP.identity(); st.derivedKey = key; }
-    var S = JSON.parse(JSON.stringify(st.derived));
+    var S = XMP.scale(JSON.parse(JSON.stringify(st.derived)), st.strength);
     TUNE.forEach(function (t) { var v = st.man[t.id] || 0; var lim = t.id === 'exposure' ? 5 : 100; S[t.id] = Math.max(-lim, Math.min(lim, (S[t.id] || 0) + v)); });
     if (st.curveOv) S.curve = st.curveOv.map(function (p) { return p.slice(); });
     st.settings = S;
@@ -127,6 +127,9 @@
       tl.style.display = tr.style.display = '';
     } else tl.style.display = tr.style.display = 'none';
   }
+
+  $('strength').oninput = function () { st.strength = +this.value / 100; $('strengthVal').textContent = this.value + '%'; refresh(true); };
+  $('strength').ondblclick = function () { this.value = 100; st.strength = 1; $('strengthVal').textContent = '100%'; refresh(); };
 
   /* ---------- fine tune sliders ---------- */
   var TUNE = [
