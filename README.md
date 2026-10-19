@@ -21,6 +21,8 @@ Three sliders: Match brightness (the light and dark balance), Match colour (tint
 - Overall Saturation.
 - The colour mixer: Hue and Saturation for the eight colours (red, orange, yellow, green, aqua, blue, purple, magenta).
 
+You can also save the edited picture itself (PNG lossless, or JPG at top quality) at the native pixel size of the photo you loaded. That is the tool's own preview maths, so it may differ slightly from Lightroom. The preset file is the one to trust in Lightroom.
+
 The page lists exactly what ended up in your preset before you download it. Settings it does not need are left out of the file, so the preset only touches what it sets.
 
 ## How to use it in Lightroom
