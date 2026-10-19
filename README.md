@@ -14,9 +14,12 @@ I built Cube Lab to make LUTs for video. Preset Lab is the same idea for photos.
 
 Three sliders: Match brightness (the light and dark balance), Match colour (tint and richness) and Colour mixer (hue and saturation of individual colours). A switch keeps your blacks and whites clean so the match does not tint them.
 
+On top of the match there is a Fine tune section: Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Temperature, Tint, Vibrance and Saturation, plus a tone curve you can drag. It works without a reference photo too, so you can use it as a plain preset maker. Everything you set goes into the .xmp file and into the edited picture.
+
 ## What goes into the preset
 
-- A tone curve, built by matching the light and dark balance of the two photos.
+- A tone curve, built by matching the light and dark balance of the two photos, or one you shaped by hand.
+- Your Fine tune settings: Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Vibrance, and relative Temperature and Tint (the kind Lightroom uses for JPEGs and other non-raw photos).
 - Red, green and blue curves, which carry the colour tint of the reference in your shadows, mids and highlights.
 - Overall Saturation.
 - The colour mixer: Hue and Saturation for the eight colours (red, orange, yellow, green, aqua, blue, purple, magenta).
@@ -35,16 +38,17 @@ Adobe says Lightroom Classic 8.2 and earlier cannot import .xmp presets.
 
 - It cannot copy masks, local edits, crops, grain or camera profiles.
 - It cannot read the real settings of the reference photo. It only sees the picture, so the preset is an estimate of the look.
-- It does not set Exposure, Contrast, White Balance, sharpening or the Color Grading wheels. The curves carry the tone and tint instead, so the preset does not fight with the exposure of whatever photo you apply it to.
+- The match itself does not set Exposure, Contrast or White Balance. The curves carry the tone and tint instead, so the match does not fight with the exposure of whatever photo you apply it to. Those only change if you move the Fine tune sliders. Sharpening, noise, grain and the Color Grading wheels are not covered.
+- The hand-drawn curve cannot go backwards (a point cannot sit lower than the point before it), so inverted curves are not possible.
 - If the reference has very different content from your photo (a night street against a green forest, say), colours can be pulled the wrong way. Lower the sliders and look at faces.
 
 ## How I checked it
 
-`npm test` runs 31 checks. They cover the curve maths, writing and reading the file, a validity check on the XMP (namespaces, the id, value ranges, curve order, balanced tags), names with odd characters, and that a brighter, warmer reference moves a photo the right way. A photo matched against itself comes out unchanged.
+`npm test` runs 46 checks. They cover the curve maths, writing and reading the file, a validity check on the XMP (namespaces, the id, value ranges, curve order, balanced tags), names with odd characters, what each Fine tune slider does to dark and light areas, and that a brighter, warmer reference moves a photo the right way. A photo matched against itself comes out unchanged.
 
 Every time you press Download, the page also reads the file back and checks that it gives the same picture as the preview.
 
-**I have not tested the file in real Lightroom.** The file is modelled on a real Lightroom preset and follows Adobe's published settings names and ranges, but that is not the same as opening it in Lightroom. If you try it and something is off, please tell me. The preview is my own copy of the maths, so Lightroom will look close but not identical, most of all for Saturation and the colour mixer. The curves are exact.
+**I have not tested the file in real Lightroom.** The file is modelled on a real Lightroom preset and follows Adobe's published settings names and ranges, but that is not the same as opening it in Lightroom. If you try it and something is off, please tell me. The preview is my own copy of the maths, so Lightroom will look close but not identical, most of all for Saturation and the colour mixer. The curves are exact. Exposure, Highlights, Shadows, Whites, Blacks, Contrast, Temperature, Tint and Vibrance are my own approximations of Adobe's maths, so expect them to look similar and not identical.
 
 ## Licence
 
