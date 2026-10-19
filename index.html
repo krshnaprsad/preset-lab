@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preset Lab - make Lightroom and Camera Raw presets from a reference photo by Zero3</title>
+<meta name="description" content="Free tool for Lightroom and Camera Raw. Pick a reference photo and your own photo, and download an .xmp preset that moves your photo toward that look. Runs in your browser, nothing is uploaded.">
+<link rel="stylesheet" href="app.css?v=1.0.0">
+</head>
+<body>
+<header class="hd"><span class="logo" role="img" aria-label="Zero3 Creatives"></span><div><h1>Preset Lab</h1><p class="tag">Match a look from a reference photo. Get a Lightroom and Camera Raw preset (.xmp)</p></div><span class="ver">v1.0.0</span></header>
+<main>
+  <div class="grid">
+    <div class="side">
+      <section class="card">
+        <h2>1. Pick the look</h2>
+        <p class="note first">Choose a photo with the look you want. Preset Lab works out settings that move your photo toward it.</p>
+        <div class="row">
+          <button class="btn" id="refBtn">Choose reference photo</button>
+          <img id="refThumb" class="thumb" alt="" hidden>
+        </div>
+        <input type="file" id="refFile" accept="image/*" hidden>
+        <h3>How far to go</h3>
+        <label class="rng">Match brightness <input type="range" id="pTone" min="0" max="1" step="0.01" value="0.8"><span id="pToneVal">0.80</span></label>
+        <label class="rng">Match colour <input type="range" id="pColour" min="0" max="1" step="0.01" value="0.7"><span id="pColourVal">0.70</span></label>
+        <label class="rng">Colour mixer <input type="range" id="pDetail" min="0" max="1" step="0.01" value="0.5"><span id="pDetailVal">0.50</span></label>
+        <label class="chk"><input type="checkbox" id="pClean" checked> Keep blacks and whites clean</label>
+        <p class="note">Brightness shapes the light and dark balance with a tone curve. Colour adds the reference's tint to shadows, mids and highlights, and its overall saturation. Colour mixer nudges the hue and saturation of individual colours, so turn it down if skin tones shift.</p>
+      </section>
+
+      <section class="card">
+        <h2>2. What is in the preset</h2>
+        <ul class="report" id="report"><li class="info"><span class="k">Note</span><span>Choose a reference photo to see the settings.</span></li></ul>
+      </section>
+
+      <section class="card">
+        <h2>3. Save your preset</h2>
+        <label>Preset name <input type="text" id="name" value="Preset Lab look" maxlength="60"></label>
+        <label>Group <input type="text" id="group" value="Preset Lab" maxlength="40"></label>
+        <div class="row"><button class="btn go" id="dl" disabled>Download .xmp</button></div>
+        <p class="msg" id="msg"></p>
+        <details class="how">
+          <summary>How to use it in Lightroom</summary>
+          <p><b>Lightroom Classic.</b> Open the Develop module. In the Presets panel on the left, click the plus (+) icon and choose Import Presets. Pick the downloaded .xmp file. It appears under the group name you chose. Click it to apply it to a photo.</p>
+          <p><b>Lightroom and Camera Raw.</b> In Lightroom (the cloud version), open Presets, click the three dots and choose Import Presets. In Photoshop's Camera Raw, open Presets, click the three dots and choose Import Presets.</p>
+          <p>Adobe says Lightroom Classic 8.2 and earlier cannot import .xmp presets.</p>
+        </details>
+        <details class="how">
+          <summary>What it cannot do</summary>
+          <p>It cannot copy masks, local edits, crops, grain, or a camera profile. It cannot read the settings of the reference, only the picture, so the result is an estimate of the look. Colours are matched from the overall picture, so a reference with very different content (for example a night street against a green forest) can pull colours the wrong way. Lower the sliders and check faces.</p>
+        </details>
+      </section>
+    </div>
+
+    <section class="card stagecard">
+      <div class="row bar">
+        <button class="btn" id="footBtn">Choose your photo</button>
+        <button class="btn" id="sampleBtn">Use sample picture</button>
+        <span class="dim" id="footNote">Showing the sample picture. Drop an image here, or use the button.</span>
+      </div>
+      <input type="file" id="footFile" accept="image/*" hidden>
+      <div class="stage" id="stage">
+        <canvas id="cv" width="960" height="540"></canvas>
+        <span class="tagl">Before</span><span class="tagr">After</span>
+        <div class="empty" id="empty"></div>
+      </div>
+      <p class="note">Drag the line to compare. The preview is my own copy of the maths, so Lightroom will look close but not identical, most of all for Saturation and the colour mixer.</p>
+    </section>
+  </div>
+  <p class="foot">Made by <b>Zero3</b>. Free to use, not free to copy. Everything runs in your browser, nothing is uploaded. <a href="https://github.com/krshnaprsad/preset-lab">Source on GitHub</a></p>
+</main>
+<script src="xmp.js?v=1.0.0"></script>
+<script src="app.js?v=1.0.0"></script>
+</body>
+</html>
