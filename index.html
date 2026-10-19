@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Preset Lab - make Lightroom and Camera Raw presets from a reference photo by Zero3</title>
 <meta name="description" content="Free tool for Lightroom and Camera Raw. Pick a reference photo and your own photo, and download an .xmp preset that moves your photo toward that look. Runs in your browser, nothing is uploaded.">
-<link rel="stylesheet" href="app.css?v=1.2.1">
+<link rel="stylesheet" href="app.css?v=1.3.0">
 </head>
 <body>
-<header class="hd"><span class="logo" role="img" aria-label="Zero3 Creatives"></span><div><h1>Preset Lab</h1><p class="tag">Match a look from a reference photo. Get a Lightroom and Camera Raw preset (.xmp)</p></div><span class="ver">v1.2.1</span></header>
+<header class="hd"><span class="logo" role="img" aria-label="Zero3 Creatives"></span><div><h1>Preset Lab</h1><p class="tag">Match a look from a reference photo. Get a Lightroom and Camera Raw preset (.xmp)</p></div><span class="ver">v1.3.0</span></header>
 <main>
   <div class="grid">
     <div class="side">
@@ -41,6 +41,19 @@
         </details>
       </section>
 
+      <section class="card" id="libCard">
+        <h2>Or pick a built-in preset <span class="dim" id="libCount"></span></h2>
+        <p class="note first">Choose one from the list and it is applied to your photo. You can still change it in Fine tune before you download.</p>
+        <input type="text" id="libQ" placeholder="Search by name" aria-label="Search presets" autocomplete="off">
+        <div class="chips" id="libChips"></div>
+        <div class="liblist" id="libList" role="listbox" aria-label="Built-in presets"></div>
+        <div class="libpick" id="libPick" hidden>
+          <div><b id="libName"></b><span class="dim" id="libGrp"></span></div>
+          <p class="note" id="libCredit" hidden></p>
+          <div class="row"><button class="btn" id="libClear">Go back to the reference photo</button></div>
+        </div>
+      </section>
+
       <section class="card">
         <h2>3. What is in the preset</h2>
         <ul class="report" id="report"><li class="info"><span class="k">Note</span><span>Choose a reference photo to see the settings.</span></li></ul>
@@ -67,7 +80,7 @@
         </details>
         <details class="how">
           <summary>What it cannot do</summary>
-          <p>It cannot copy masks, local edits, crops, grain, or a camera profile. It cannot read the settings of the reference, only the picture, so the result is an estimate of the look. Colours are matched from the overall picture, so a reference with very different content (for example a night street against a green forest) can pull colours the wrong way. Lower the sliders and check faces.</p>
+          <p>When it matches from a reference photo, it cannot copy masks, local edits, crops, grain, or a camera profile. It cannot read the settings of the reference, only the picture, so the result is an estimate of the look. Colours are matched from the overall picture, so a reference with very different content (for example a night street against a green forest) can pull colours the wrong way. Lower the sliders and check faces.</p>
         </details>
       </section>
     </div>
@@ -89,7 +102,11 @@
   </div>
   <p class="foot">Made by <b><a class="z3" href="https://www.zero3creatives.net/">Zero3</a></b>. Free to use, not free to copy. Everything runs in your browser, nothing is uploaded. <a href="https://github.com/krshnaprsad/preset-lab">Source on GitHub</a></p>
 </main>
-<script src="xmp.js?v=1.2.1"></script>
-<script src="app.js?v=1.2.1"></script>
+<script src="presets-1.js?v=1.3.0"></script>
+<script src="presets-2.js?v=1.3.0"></script>
+<script src="presets-3.js?v=1.3.0"></script>
+<script src="presets-4.js?v=1.3.0"></script>
+<script src="xmp.js?v=1.3.0"></script>
+<script src="app.js?v=1.3.0"></script>
 </body>
 </html>
