@@ -133,5 +133,18 @@ ok(pk && pk.orient === 6, 'RAW finder reads the turn from the file header when t
 ok(RW.pick(new Uint8Array(5000).fill(3)) === null, 'RAW finder returns nothing for a file with no picture');
 ok(RW.isRaw('IMG_1.CR3') && RW.isRaw('a.dng') && !RW.isRaw('photo.jpg'), 'RAW extensions recognised');
 
+/* ---- strength and highlight safety ---- */
+const bb = win.PRESETS.find((p) => p.n === 'Bright Blue Shadows'), bbS = X.fromPreset(bb);
+ok(maxDiff(X.render(photo, X.scale(bbS, 0), 64), photo) <= 1, 'strength 0 gives back the original picture');
+ok(X.scale(bbS, 1) === bbS, 'strength 100 leaves the preset as it is');
+const half = X.scale(bbS, 0.5);
+ok(half.hue.every((v, i) => v === Math.round(bbS.hue[i] * 0.5)) && Math.abs(half.exposure - bbS.exposure * 0.5) < 0.01, 'strength 50 halves the settings');
+ok(X.validate(X.write(half, { name: 'x', uuid: uuid() })).length === 0, 'a reduced preset still writes a valid file');
+const crv = X.fromPreset(win.PRESETS.find((p) => p.c && p.c.m)); const crvH = X.scale(crv, 0.5);
+ok(crvH.curve.every((p, i) => i === 0 || p[1] >= crvH.curve[i - 1][1]), 'a reduced curve still never goes backwards');
+const brightRow = new Uint8ClampedArray(256 * 4); for (let x = 0; x < 256; x++) { brightRow[x * 4] = 235 + x / 255 * 20; brightRow[x * 4 + 1] = 222 + x / 255 * 33; brightRow[x * 4 + 2] = 195 + x / 255 * 60; brightRow[x * 4 + 3] = 255; }
+const bo = X.render(brightRow, bbS, 256), seen = new Set(); for (let x = 0; x < 256; x++) seen.add(bo[x * 4] + ',' + bo[x * 4 + 1] + ',' + bo[x * 4 + 2]);
+ok(seen.size > 50, 'bright cream tones keep their detail instead of going flat (' + seen.size + ' different colours)');
+
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
