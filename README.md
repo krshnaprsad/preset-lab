@@ -54,7 +54,7 @@ Adobe says Lightroom Classic 8.2 and earlier cannot import .xmp presets.
 
 Every time you press Download, the page also reads the file back and checks that it gives the same picture as the preview.
 
-**I have not tested the file in real Lightroom.** The file is modelled on a real Lightroom preset and follows Adobe's published settings names and ranges, but that is not the same as opening it in Lightroom. If you try it and something is off, please tell me. The preview is my own copy of the maths, so Lightroom will look close but not identical, most of all for Saturation and the colour mixer. The curves are exact. Exposure, Highlights, Shadows, Whites, Blacks, Contrast, Temperature, Tint and Vibrance are my own approximations of Adobe's maths, so expect them to look similar and not identical.
+**Tested in Lightroom.** I opened the .xmp files in Lightroom and they work. The preview is my own copy of the maths, so Lightroom will look close but not identical, most of all for Saturation and the colour mixer. The curves are exact. Exposure, Highlights, Shadows, Whites, Blacks, Contrast, Temperature, Tint and Vibrance are my own approximations of Adobe's maths, so expect them to look similar and not identical.
 
 ## Licence
 
