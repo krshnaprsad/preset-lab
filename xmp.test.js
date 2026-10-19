@@ -99,5 +99,27 @@ ok(X.validate(X.write(adj({ exposure: 0.5 }), { name: 'x', uuid: uuid() }).repla
 ok(X.validate(X.write(adj({ contrast: 30 }), { name: 'x', uuid: uuid() }).replace('"+30"', '"+300"')).length > 0, 'contrast out of range caught');
 ok(maxDiff(X.render(photo, X.identity()), photo) <= 1, 'identity still untouched');
 
+/* ---- built-in library ---- */
+const fs = require('fs'), vm = require('vm');
+const win = { PRESETS: [] }, ctx = vm.createContext({ window: win });
+[1, 2, 3, 4].forEach((n) => vm.runInContext(fs.readFileSync(__dirname + '/presets-' + n + '.js', 'utf8'), ctx));
+ok(win.PRESETS.length === 340, 'library has 340 presets (got ' + win.PRESETS.length + ')');
+ok(new Set(win.PRESETS.map((p) => p.n)).size === 340, 'every library name is different');
+ok(win.PRESETS.every((p) => !/[\u2014]/.test(p.n) && p.n.length <= 40), 'names are short and have no long dash');
+let libBad = 0, libDiff = 0;
+win.PRESETS.forEach((p) => {
+  const S = X.fromPreset(p), t = X.write(S, { name: p.n, group: p.g, uuid: uuid(), copyright: p.k, contact: p.ci, cluster: p.cl });
+  if (X.validate(t).length) libBad++;
+  const B = X.read(t); if (maxDiff(X.render(photo, S, 64), X.render(photo, B, 64)) > 1) libDiff++;
+  if (p.k && t.indexOf('crs:Copyright="' + p.k + '"') < 0) libBad++;
+});
+ok(libBad === 0, 'every library preset writes a valid file with its credit text kept');
+ok(libDiff === 0, 'every library preset reads back to the same picture');
+const lumP = X.render(photo, adj({ lum: [100, 100, 100, 100, 100, 100, 100, 100] }), 64); ok(maxDiff(lumP, photo) > 4, 'colour brightness bands change the picture');
+const splitP = X.render(grey, Object.assign(X.identity(), { extra: { SplitToningShadowHue: 220, SplitToningShadowSaturation: 80 } }), 64); ok(mean(splitP, 2) > mean(splitP, 0) + 2, 'split toning runs');
+const vigS = Object.assign(X.identity(), { extra: { PostCropVignetteAmount: -80 } });
+const vg = X.render(pics(12, () => [200, 200, 200]), vigS, 64), vgi = vg.length / 4;
+ok(vg[0] < vg[(156 * 64 + 32) * 4], 'vignette darkens the corners');
+
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
