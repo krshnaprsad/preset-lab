@@ -4,7 +4,7 @@
   var cv = $('cv'), ctx = cv.getContext('2d');
   var MAXW = 960;
 
-  var st = { file: null, foot: null, ref: null, settings: null, graded: null, split: 0.5 };
+  var st = { proxy: null, fast: false, fid: 0, derivedKey: '', derived: null, curveOv: null, man: {}, file: null, foot: null, ref: null, settings: null, graded: null, split: 0.5 };
 
   /* ---------- images ---------- */
   function toImageData(bmp, maxW) {
@@ -39,8 +39,15 @@
     x.fillStyle = '#fff'; x.font = '700 28px system-ui,Arial'; x.fillText('Sample frame', 60, 496);
     return x.getImageData(0, 0, c.width, c.height);
   }
+  function makeProxy(img) {
+    var w = Math.min(img.width, 480), h = Math.max(1, Math.round(img.height * w / img.width));
+    if (w === img.width) return img;
+    var c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').putImageData(img, 0, 0);
+    var d = document.createElement('canvas'); d.width = w; d.height = h; var x = d.getContext('2d', { willReadFrequently: true });
+    x.imageSmoothingQuality = 'high'; x.drawImage(c, 0, 0, w, h); return x.getImageData(0, 0, w, h);
+  }
   function setFoot(img, label, file) {
-    st.file = file || null; st.foot = img; cv.width = img.width; cv.height = img.height;
+    st.fid++; st.file = file || null; st.foot = img; st.proxy = makeProxy(img); cv.width = img.width; cv.height = img.height;
     $('footNote').textContent = label; refresh();
   }
 
@@ -48,8 +55,12 @@
   function opts() { return { tone: +$('pTone').value, colour: +$('pColour').value, detail: +$('pDetail').value, keepClean: $('pClean').checked }; }
   function say(t, cls) { var m = $('msg'); m.textContent = t; m.className = 'msg' + (cls ? ' ' + cls : ''); }
 
-  var pending = 0;
-  function refresh() { if (pending) return; pending = requestAnimationFrame(function () { pending = 0; run(); }); }
+  var pending = 0, idleT = 0;
+  function refresh(fastOk) {
+    clearTimeout(idleT);
+    if (fastOk) { st.fast = true; idleT = setTimeout(function () { st.fast = false; run(); }, 180); } else st.fast = false;
+    if (pending) return; pending = requestAnimationFrame(function () { pending = 0; run(); });
+  }
   function run() {
     var ul = $('report'); ul.innerHTML = '';
     function row(level, label, text) {
@@ -57,19 +68,23 @@
       var k = document.createElement('span'); k.className = 'k'; k.textContent = label;
       var tx = document.createElement('span'); tx.textContent = text; li.appendChild(k); li.appendChild(tx); ul.appendChild(li);
     }
-    if (!st.ref || !st.foot) {
-      st.settings = null; st.graded = null; $('dl').disabled = true; $('dlPic').disabled = true;
-      $('empty').textContent = st.ref ? '' : 'Choose a reference photo to see the match.';
-      row('info', 'Note', 'Choose a reference photo to see the settings.');
-      draw(); return;
-    }
-    st.settings = XMP.derive(st.foot.data, st.ref.data, opts());
-    st.graded = new ImageData(XMP.render(st.foot.data, st.settings), st.foot.width, st.foot.height);
-    $('empty').textContent = ''; $('dl').disabled = false; $('dlPic').disabled = false;
+    if (!st.foot) { st.settings = null; st.graded = null; $('dl').disabled = true; $('dlPic').disabled = true; draw(); return; }
+    var o = opts(), key = st.fid + '|' + JSON.stringify(o) + '|' + (st.ref ? 1 : 0);
+    if (key !== st.derivedKey) { st.fast = false; st.derived = st.ref ? XMP.derive(st.foot.data, st.ref.data, o) : XMP.identity(); st.derivedKey = key; }
+    var S = JSON.parse(JSON.stringify(st.derived));
+    TUNE.forEach(function (t) { var v = st.man[t.id] || 0; if (t.id === 'sat') S.sat = Math.max(-100, Math.min(100, S.sat + v)); else S[t.id] = v; });
+    if (st.curveOv) S.curve = st.curveOv.map(function (p) { return p.slice(); });
+    st.settings = S;
+    var srcImg = (st.fast && key === st.derivedKey && st.proxy) ? st.proxy : st.foot;
+    st.graded = new ImageData(XMP.render(srcImg.data, S), srcImg.width, srcImg.height);
+    var d = XMP.describe(S), any = d.length > 0;
+    $('empty').textContent = (!st.ref && !any) ? 'Choose a reference photo, or move a slider, to see the change.' : '';
+    $('dl').disabled = !any; $('dlPic').disabled = !any;
+    drawCurve();
+    if (!any) row('info', 'Note', st.ref ? 'These two photos already look alike, so the preset changes almost nothing.' : 'Nothing set yet. Choose a reference photo or move a slider.');
     var d = XMP.describe(st.settings);
-    if (!d.length) row('ok', 'Note', 'These two photos already look alike, so the preset changes almost nothing.');
     d.forEach(function (t) { row('ok', 'Sets', t); });
-    row('info', 'Leaves', 'Exposure, contrast, white balance, sharpening, masks, crop and profile stay as they are on the photo you apply it to.');
+    row('info', 'Leaves', 'Anything not listed above (sharpening, noise, masks, crop, profile, Color Grading wheels) stays as it is on the photo you apply it to.');
     draw();
   }
 
@@ -77,20 +92,95 @@
   function draw() {
     if (!st.foot) return;
     var w = st.foot.width, h = st.foot.height;
-    bufB.width = bufA.width = w; bufB.height = bufA.height = h;
+    bufB.width = w; bufB.height = h;
     bufB.getContext('2d').putImageData(st.foot, 0, 0);
     ctx.clearRect(0, 0, w, h); ctx.drawImage(bufB, 0, 0);
     var tl = document.querySelector('.tagl'), tr = document.querySelector('.tagr');
     if (st.graded) {
-      bufA.getContext('2d').putImageData(st.graded, 0, 0);
-      var sx = Math.round(w * st.split);
-      ctx.drawImage(bufA, sx, 0, w - sx, h, sx, 0, w - sx, h);
+      var sx = Math.round(w * st.split), sc = st.graded.width / w;
+      bufA.width = st.graded.width; bufA.height = st.graded.height; bufA.getContext('2d').putImageData(st.graded, 0, 0);
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(bufA, sx * sc, 0, (w - sx) * sc, h * sc, sx, 0, w - sx, h);
       ctx.fillStyle = '#fff'; ctx.fillRect(sx - 1, 0, 2, h);
       ctx.beginPath(); ctx.arc(sx, h / 2, 14, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
       ctx.fillStyle = '#000'; ctx.font = '700 15px system-ui,Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('\u2194', sx, h / 2 + 1);
       tl.style.display = tr.style.display = '';
     } else tl.style.display = tr.style.display = 'none';
   }
+
+  /* ---------- fine tune sliders ---------- */
+  var TUNE = [
+    { id: 'exposure', label: 'Exposure', min: -3, max: 3, step: 0.05, d: 2 },
+    { id: 'contrast', label: 'Contrast', min: -100, max: 100, step: 1 },
+    { id: 'highlights', label: 'Highlights', min: -100, max: 100, step: 1 },
+    { id: 'shadows', label: 'Shadows', min: -100, max: 100, step: 1 },
+    { id: 'whites', label: 'Whites', min: -100, max: 100, step: 1 },
+    { id: 'blacks', label: 'Blacks', min: -100, max: 100, step: 1 },
+    { id: 'temp', label: 'Temperature', min: -100, max: 100, step: 1 },
+    { id: 'tint', label: 'Tint', min: -100, max: 100, step: 1 },
+    { id: 'vibrance', label: 'Vibrance', min: -100, max: 100, step: 1 },
+    { id: 'sat', label: 'Saturation', min: -100, max: 100, step: 1 }
+  ];
+  (function buildTune() {
+    var box = $('tune');
+    TUNE.forEach(function (t) {
+      var lab = document.createElement('label'); lab.className = 'rng';
+      var sp = document.createElement('span'); sp.textContent = t.label;
+      var inp = document.createElement('input'); inp.type = 'range'; inp.min = t.min; inp.max = t.max; inp.step = t.step; inp.value = 0; inp.id = 'm_' + t.id;
+      var val = document.createElement('span'); val.id = 'mv_' + t.id; val.textContent = '0';
+      function show() { var v = +inp.value; val.textContent = (v > 0 ? '+' : '') + (t.d ? v.toFixed(t.d) : v); }
+      inp.oninput = function () { st.man[t.id] = +inp.value; show(); refresh(true); };
+      inp.ondblclick = function () { inp.value = 0; st.man[t.id] = 0; show(); refresh(); };
+      lab.appendChild(sp); lab.appendChild(inp); lab.appendChild(val); box.appendChild(lab);
+    });
+    $('tuneReset').onclick = function () {
+      TUNE.forEach(function (t) { st.man[t.id] = 0; $('m_' + t.id).value = 0; $('mv_' + t.id).textContent = '0'; }); refresh();
+    };
+  })();
+
+  /* ---------- curve editor (light and dark balance) ---------- */
+  var cc = $('curveCv'), cx = cc.getContext('2d'), CS = cc.width, dragI = -1;
+  function curPts() { return st.curveOv || (st.settings ? st.settings.curve : XMP.curveIdentity()); }
+  function drawCurve() {
+    cx.fillStyle = '#0b0b0b'; cx.fillRect(0, 0, CS, CS);
+    cx.strokeStyle = '#222'; cx.lineWidth = 1;
+    for (var g = 1; g < 4; g++) { cx.beginPath(); cx.moveTo(g * CS / 4, 0); cx.lineTo(g * CS / 4, CS); cx.moveTo(0, g * CS / 4); cx.lineTo(CS, g * CS / 4); cx.stroke(); }
+    var pts = curPts(), t = XMP.curveTable(pts);
+    cx.strokeStyle = '#f2f2f2'; cx.lineWidth = 2; cx.beginPath();
+    for (var i = 0; i < 256; i++) { var X0 = i / 255 * CS, Y0 = CS - t[i] * CS; if (i) cx.lineTo(X0, Y0); else cx.moveTo(X0, Y0); }
+    cx.stroke();
+    pts.forEach(function (p, k) { cx.beginPath(); cx.arc(p[0] / 255 * CS, CS - p[1] / 255 * CS, k === dragI ? 6 : 4.5, 0, 7); cx.fillStyle = '#fff'; cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1.5; cx.stroke(); });
+    $('curveNote').textContent = st.curveOv ? 'Curve edited by hand. Match sliders no longer change it.' : (st.ref ? 'Curve from the match. Drag a point to change it.' : 'Drag a point or click the line to add one.');
+    $('curveReset').hidden = !st.curveOv;
+  }
+  function cpos(e) { var r = cc.getBoundingClientRect(); return [Math.round(Math.max(0, Math.min(255, (e.clientX - r.left) / r.width * 255))), Math.round(Math.max(0, Math.min(255, 255 - (e.clientY - r.top) / r.height * 255)))]; }
+  function fixMono(pts, i) {
+    // keep x between neighbours and y never going backwards
+    if (i > 0 && i < pts.length - 1) {
+      pts[i][0] = Math.max(pts[i - 1][0] + 1, Math.min(pts[i + 1][0] - 1, pts[i][0]));
+    } else pts[i][0] = i === 0 ? 0 : 255;
+    var lo = i > 0 ? pts[i - 1][1] : 0, hi = i < pts.length - 1 ? pts[i + 1][1] : 255;
+    pts[i][1] = Math.max(lo, Math.min(hi, pts[i][1]));
+  }
+  cc.addEventListener('pointerdown', function (e) {
+    var p = cpos(e), pts = curPts().map(function (q) { return q.slice(); }), best = -1, bd = 14;
+    pts.forEach(function (q, k) { var d = Math.hypot((q[0] - p[0]) * cc.getBoundingClientRect().width / 255, (q[1] - p[1]) * cc.getBoundingClientRect().height / 255); if (d < bd) { bd = d; best = k; } });
+    if (best < 0) {
+      var k2 = 0; while (k2 < pts.length && pts[k2][0] < p[0]) k2++;
+      if (k2 === 0 || k2 >= pts.length || pts[k2][0] === p[0] || pts[k2 - 1][0] === p[0]) return;
+      pts.splice(k2, 0, p); best = k2;
+    }
+    dragI = best; st.curveOv = pts; cc.setPointerCapture(e.pointerId); fixMono(pts, best); refresh(true);
+  });
+  cc.addEventListener('pointermove', function (e) {
+    if (dragI < 0 || !st.curveOv) return; var p = cpos(e); st.curveOv[dragI] = p; fixMono(st.curveOv, dragI); refresh();
+  });
+  cc.addEventListener('pointerup', function () { dragI = -1; refresh(); });
+  cc.addEventListener('dblclick', function (e) {
+    var p = cpos(e), pts = curPts().map(function (q) { return q.slice(); });
+    for (var k = 1; k < pts.length - 1; k++) if (Math.hypot(pts[k][0] - p[0], pts[k][1] - p[1]) < 12) { pts.splice(k, 1); st.curveOv = pts; refresh(); return; }
+  });
+  $('curveReset').onclick = function () { st.curveOv = null; refresh(); };
 
   /* ---------- compare handle ---------- */
   var dragging = false;
@@ -113,7 +203,7 @@
   $('refFile').onchange = function () {
     var f = $('refFile').files[0]; $('refFile').value = ''; if (!f) return;
     readImage(f, 600).then(function (img) {
-      st.ref = img;
+      st.ref = img; st.fid++;
       var c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').putImageData(img, 0, 0);
       var t = $('refThumb'); t.src = c.toDataURL('image/jpeg', 0.8); t.hidden = false;
       $('refBtn').textContent = 'Change reference photo'; refresh();
