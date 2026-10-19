@@ -130,3 +130,4 @@ select{background:#111;color:#f2f2f2;border:1px solid var(--line);border-radius:
 .libpick{margin-top:10px}.libpick .dim{margin-left:8px}
 .empty{position:static;padding:10px 12px;background:#000;border-top:1px solid var(--line)}
 @media(max-width:860px){.grid>.stagecard{order:-1}}
+.tunebox>summary b{font-weight:700}.tunebox>summary .dim{font-weight:400;font-size:14px}
