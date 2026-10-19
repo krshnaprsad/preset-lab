@@ -2,7 +2,7 @@
 
 Pick a reference photo and your own photo, and get a Lightroom and Camera Raw preset (.xmp) that moves your photo toward that look.
 
-Made by Zero3.
+Made by [Zero3](https://www.zero3creatives.net/).
 
 ## Why I built Preset Lab
 
