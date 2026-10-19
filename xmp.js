@@ -8,8 +8,13 @@
   X.clamp = clamp;
 
   /* ---------- colour maths (OKLab) ---------- */
-  function toLin(c) { return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
-  function toGam(c) { c = clamp(c, 0, 1); return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; }
+  function toLinExact(c) { return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+  function toGamExact(c) { c = clamp(c, 0, 1); return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; }
+  /* Lookup tables with interpolation: the same maths, much faster per pixel. */
+  var TN = 8192, LIN = new Float32Array(TN + 2), GAM = new Float32Array(TN + 2);
+  for (var ti = 0; ti <= TN + 1; ti++) { LIN[ti] = toLinExact(Math.min(1, ti / TN)); GAM[ti] = toGamExact(Math.min(1, ti / TN)); }
+  function toLin(c) { c = c < 0 ? 0 : c > 1 ? 1 : c; var x = c * TN, i = x | 0, f = x - i; return LIN[i] + (LIN[i + 1] - LIN[i]) * f; }
+  function toGam(c) { c = c < 0 ? 0 : c > 1 ? 1 : c; var x = c * TN, i = x | 0, f = x - i; return GAM[i] + (GAM[i + 1] - GAM[i]) * f; }
   function rgbToLab(r, g, b, o) {
     r = toLin(r); g = toLin(g); b = toLin(b);
     var l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b),
@@ -46,7 +51,7 @@
   /* ---------- settings ---------- */
   X.curveIdentity = function () { return [[0, 0], [255, 255]]; };
   X.identity = function () {
-    return { sat: 0, hue: [0, 0, 0, 0, 0, 0, 0, 0], bsat: [0, 0, 0, 0, 0, 0, 0, 0], curve: X.curveIdentity(), curveR: X.curveIdentity(), curveG: X.curveIdentity(), curveB: X.curveIdentity() };
+    return { exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0, vibrance: 0, temp: 0, tint: 0, sat: 0, hue: [0, 0, 0, 0, 0, 0, 0, 0], bsat: [0, 0, 0, 0, 0, 0, 0, 0], curve: X.curveIdentity(), curveR: X.curveIdentity(), curveG: X.curveIdentity(), curveB: X.curveIdentity() };
   };
   function isIdCurve(c) { return c.length === 2 && c[0][0] === 0 && c[0][1] === 0 && c[1][0] === 255 && c[1][1] === 255; }
   X.isIdentityCurve = isIdCurve;
@@ -77,14 +82,37 @@
   function look(t, v) { var x = clamp(v, 0, 1) * 255, i = Math.min(254, Math.floor(x)), f = x - i; return t[i] + (t[i + 1] - t[i]) * f; }
 
   /* ---------- render: apply the settings to pixels (RGBA bytes) ---------- */
+  function ss01(a, b, x) { var u = clamp((x - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); }
   X.render = function (px, S) {
     var out = new Uint8ClampedArray(px.length), n = px.length / 4, w = [0, 0, 0, 0, 0, 0, 0, 0], lab = [0, 0, 0], rgb = [0, 0, 0];
     var useColour = S.sat !== 0 || S.hue.some(function (v) { return v !== 0; }) || S.bsat.some(function (v) { return v !== 0; });
     var tm = X.curveTable(S.curve), tr = X.curveTable(S.curveR), tg = X.curveTable(S.curveG), tb = X.curveTable(S.curveB);
     var gs = 1 + S.sat / 100, i, k, r, g, b;
+    var flat = S.hue.every(function (v) { return v === 0; }) && S.bsat.every(function (v) { return v === 0; });
+    var E = S.exposure || 0, CO = (S.contrast || 0) / 100, HI = (S.highlights || 0) / 100, SH = (S.shadows || 0) / 100, WH = (S.whites || 0) / 100, BL = (S.blacks || 0) / 100;
+    var VI = (S.vibrance || 0) / 100, TE = (S.temp || 0) / 100, TI = (S.tint || 0) / 100;
+    var useWB = E !== 0 || TE !== 0 || TI !== 0, useTone = CO || HI || SH || WH || BL, useVib = VI !== 0;
+    var gE = Math.pow(2, E), gR = gE * Math.pow(2, 0.5 * TE), gB = gE * Math.pow(2, -0.5 * TE), gG = gE * Math.pow(2, -0.3 * TI);
     for (i = 0; i < n; i++) {
       r = px[i * 4] / 255; g = px[i * 4 + 1] / 255; b = px[i * 4 + 2] / 255;
-      if (useColour) {
+      if (useWB) { r = toGam(toLin(r) * gR); g = toGam(toLin(g) * gG); b = toGam(toLin(b) * gB); }
+      if (useTone) {
+        var Y = 0.2126 * r + 0.7152 * g + 0.0722 * b, dY = 0;
+        dY += SH * 0.35 * (1 - Y) * (1 - Y) * Math.min(1, Y * 6);
+        dY += HI * 0.3 * Y * Y * Math.min(1, (1 - Y) * 6);
+        dY += WH * 0.2 * ss01(0.55, 1, Y);
+        dY += BL * 0.2 * (1 - ss01(0, 0.45, Y));
+        dY -= CO * 0.16 * Math.sin(2 * Math.PI * Y);
+        r = clamp(r + dY, 0, 1); g = clamp(g + dY, 0, 1); b = clamp(b + dY, 0, 1);
+      }
+      if (useVib) {
+        var mx = Math.max(r, g, b), mn = Math.min(r, g, b), sv = mx > 0 ? (mx - mn) / mx : 0, bo = VI * (1 - sv) * 0.8, me = (r + g + b) / 3;
+        r = clamp(r + (r - me) * bo, 0, 1); g = clamp(g + (g - me) * bo, 0, 1); b = clamp(b + (b - me) * bo, 0, 1);
+      }
+      if (useColour && flat) {
+        rgbToLab(r, g, b, lab);
+        labToRgb(lab[0], lab[1] * gs, lab[2] * gs, rgb); r = rgb[0]; g = rgb[1]; b = rgb[2];
+      } else if (useColour) {
         rgbToLab(r, g, b, lab);
         var C = Math.sqrt(lab[1] * lab[1] + lab[2] * lab[2]);
         if (C > 1e-5) {
@@ -200,6 +228,9 @@
     var out = [];
     if (!isIdCurve(S.curve)) out.push('Tone curve with ' + S.curve.length + ' points (light and dark balance)');
     if (!isIdCurve(S.curveR) || !isIdCurve(S.curveG) || !isIdCurve(S.curveB)) out.push('Red, green and blue curves (colour tint in shadows, mids and highlights)');
+    function adj(label, v, d) { if (v) out.push(label + ' ' + (v > 0 ? '+' : '') + (d ? v.toFixed(d) : v)); }
+    adj('Exposure', S.exposure, 2); adj('Contrast', S.contrast); adj('Highlights', S.highlights); adj('Shadows', S.shadows); adj('Whites', S.whites); adj('Blacks', S.blacks);
+    adj('Temperature (relative)', S.temp); adj('Tint (relative)', S.tint); adj('Vibrance', S.vibrance);
     if (S.sat) out.push('Saturation ' + (S.sat > 0 ? '+' : '') + S.sat);
     var bands = [];
     X.BANDS.forEach(function (nm, i) {
@@ -230,6 +261,15 @@
       'crs:SupportsMonochrome="True"', 'crs:SupportsHighDynamicRange="True"', 'crs:SupportsNormalDynamicRange="True"', 'crs:SupportsSceneReferred="True"',
       'crs:SupportsOutputReferred="True"', 'crs:CameraModelRestriction=""', 'crs:Copyright=""', 'crs:ContactInfo=""', 'crs:Version="11.1"', 'crs:ProcessVersion="11.0"'
     ];
+    if (S.temp) attrs.push('crs:IncrementalTemperature="' + sgn(S.temp) + '"');
+    if (S.tint) attrs.push('crs:IncrementalTint="' + sgn(S.tint) + '"');
+    if (S.vibrance) attrs.push('crs:Vibrance="' + sgn(S.vibrance) + '"');
+    if (S.exposure) attrs.push('crs:Exposure2012="' + (S.exposure > 0 ? '+' : '') + S.exposure.toFixed(2) + '"');
+    if (S.contrast) attrs.push('crs:Contrast2012="' + sgn(S.contrast) + '"');
+    if (S.highlights) attrs.push('crs:Highlights2012="' + sgn(S.highlights) + '"');
+    if (S.shadows) attrs.push('crs:Shadows2012="' + sgn(S.shadows) + '"');
+    if (S.whites) attrs.push('crs:Whites2012="' + sgn(S.whites) + '"');
+    if (S.blacks) attrs.push('crs:Blacks2012="' + sgn(S.blacks) + '"');
     if (S.sat) attrs.push('crs:Saturation="' + sgn(S.sat) + '"');
     X.BANDS.forEach(function (n, i) { if (S.hue[i]) attrs.push('crs:HueAdjustment' + n + '="' + sgn(S.hue[i]) + '"'); });
     X.BANDS.forEach(function (n, i) { if (S.bsat[i]) attrs.push('crs:SaturationAdjustment' + n + '="' + sgn(S.bsat[i]) + '"'); });
@@ -250,7 +290,8 @@
   X.read = function (text) {
     var S = X.identity(), m;
     function num(name) { var r = new RegExp('crs:' + name + '="([-+]?[0-9.]+)"').exec(text); return r ? parseFloat(r[1]) : 0; }
-    S.sat = num('Saturation');
+    S.sat = num('Saturation'); S.vibrance = num('Vibrance'); S.temp = num('IncrementalTemperature'); S.tint = num('IncrementalTint');
+    S.exposure = num('Exposure2012'); S.contrast = num('Contrast2012'); S.highlights = num('Highlights2012'); S.shadows = num('Shadows2012'); S.whites = num('Whites2012'); S.blacks = num('Blacks2012');
     X.BANDS.forEach(function (n, i) { S.hue[i] = num('HueAdjustment' + n); S.bsat[i] = num('SaturationAdjustment' + n); });
     function curve(tag) {
       var r = new RegExp('<crs:' + tag + '>\\s*<rdf:Seq>([\\s\\S]*?)</rdf:Seq>').exec(text);
@@ -280,8 +321,10 @@
     });
     if (stack.length) p.push('unclosed tag ' + stack[stack.length - 1]);
     if (/[<>]/.test(rest)) p.push('stray angle bracket');
-    var ranges = /crs:(Saturation|HueAdjustment\w+|SaturationAdjustment\w+)="([^"]*)"/g;
+    var ranges = /crs:(Saturation|Vibrance|IncrementalTemperature|IncrementalTint|Contrast2012|Highlights2012|Shadows2012|Whites2012|Blacks2012|HueAdjustment\w+|SaturationAdjustment\w+)="([^"]*)"/g;
     while ((m = ranges.exec(text))) { var v = Number(m[2]); if (!/^[-+]?\d+$/.test(m[2]) || v < -100 || v > 100) p.push(m[1] + ' is out of range: ' + m[2]); }
+    var ex = /crs:Exposure2012="([^"]*)"/.exec(text);
+    if (ex && (!/^[-+]?\d+(\.\d+)?$/.test(ex[1]) || Math.abs(Number(ex[1])) > 5)) p.push('Exposure2012 is out of range: ' + ex[1]);
     var cur = /<crs:(ToneCurvePV2012\w*)>\s*<rdf:Seq>([\s\S]*?)<\/rdf:Seq>/g;
     while ((m = cur.exec(text))) {
       var pts = [], re = /<rdf:li>\s*(\d+)\s*,\s*(\d+)\s*<\/rdf:li>/g, q;
