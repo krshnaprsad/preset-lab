@@ -115,3 +115,16 @@ select{background:#111;color:#f2f2f2;border:1px solid var(--line);border-radius:
 #tune .rng span:first-child{min-width:92px;text-align:left;color:var(--text)}
 .tunebox{margin:0}.tunebox>summary{font-size:18px;cursor:pointer;padding:2px 0}.tunebox[open]>summary{margin-bottom:10px}.edited{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:1px solid #4a4a4a;border-radius:999px;padding:2px 8px;margin-left:8px;color:#ddd;vertical-align:middle}
 .tunebox>summary{color:var(--text)}
+
+#libQ{width:100%;box-sizing:border-box;margin:0 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.chip{appearance:none;border:1px solid var(--line2);background:#000;color:var(--dim);border-radius:99px;padding:4px 10px;font:12px system-ui,Arial,sans-serif;cursor:pointer}
+.chip.on{background:var(--text);color:#000;border-color:var(--text)}
+.liblist{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:9px;background:#000}
+.libitem{display:block;width:100%;text-align:left;appearance:none;border:0;border-bottom:1px solid var(--line);background:#000;color:var(--text);padding:8px 10px;font:13px system-ui,Arial,sans-serif;cursor:pointer}
+.libitem:last-child{border-bottom:0}
+.libitem:hover,.libitem:focus-visible{background:#161616;outline:none}
+.libitem.on{background:var(--text);color:#000}
+.libitem small{color:var(--dim);margin-left:6px}.libitem.on small{color:#333}
+.libnone{padding:12px;color:var(--dim);font-size:13px}
+.libpick{margin-top:10px}.libpick .dim{margin-left:8px}
