@@ -28,7 +28,7 @@ A Preset strength slider sits under the picture. It goes from 0 to 100 percent (
 
 ## RAW files
 
-You can load a camera RAW file as your photo or as the reference: DNG, CR2, CR3, NEF, ARW, RAF, ORF, RW2 and more (full list in raw.js). I do not do a full RAW develop. Almost every RAW file carries a full-size JPEG preview that the camera made, and Preset Lab finds that and uses it. If a DNG has no preview at all (some Xiaomi and OnePlus phones), I read its plain uncompressed sensor data instead, at half size, with a simple automatic colour and brightness that is not Adobe's. It all happens in your browser, nothing is uploaded. On Android, use the Choose RAW file button for RAW files so your Gallery still shows up for normal photos.
+You can load a camera RAW file as your photo or as the reference: DNG, CR2, CR3, NEF, ARW, RAF, ORF, RW2 and more (full list in raw.js). I do not do a full RAW develop. Almost every RAW file carries a full-size JPEG preview that the camera made, and Preset Lab finds that and uses it. If a DNG has no preview at all (some Xiaomi and OnePlus phones), I read its sensor data instead (uncompressed or lossless JPEG, which covers most phones including Xiaomi, Pixel and iPhone ProRAW), at reduced size, with a simple automatic colour and brightness that is not Adobe's. It all happens in your browser, nothing is uploaded. On Android, use the Choose RAW file button for RAW files so your Gallery still shows up for normal photos.
 
 What that means in practice: the preview is the camera's own rendering (its picture style, white balance and contrast), not the untouched sensor data, and its size is whatever the camera stored (about 1920 px wide on some Sony, Panasonic and Fuji bodies, full size on Canon and Nikon). The edited picture you can download is that preview size, not the full sensor size. A RAW file with no usable preview that I also cannot read (compressed or packed sensor data) gives a clear message and you can use a JPG or TIFF from your RAW editor instead. The preset itself is just a settings file, so it works on your real RAW files in Lightroom.
 
@@ -60,7 +60,7 @@ Adobe says Lightroom Classic 8.2 and earlier cannot import .xmp presets.
 
 ## How I checked it
 
-`npm test` runs 64 checks. They cover finding the preview inside a RAW file, the 340 built-in presets (each writes a valid file, keeps its credit text, and reads back to the same picture), the curve maths, writing and reading the file, a validity check on the XMP (namespaces, the id, value ranges, curve order, balanced tags), names with odd characters, what each Fine tune slider does to dark and light areas, and that a brighter, warmer reference moves a photo the right way. A photo matched against itself comes out unchanged.
+`npm test` runs 65 checks. They cover finding the preview inside a RAW file, the 340 built-in presets (each writes a valid file, keeps its credit text, and reads back to the same picture), the curve maths, writing and reading the file, a validity check on the XMP (namespaces, the id, value ranges, curve order, balanced tags), names with odd characters, what each Fine tune slider does to dark and light areas, and that a brighter, warmer reference moves a photo the right way. A photo matched against itself comes out unchanged.
 
 Every time you press Download, the page also reads the file back and checks that it gives the same picture as the preview.
 
