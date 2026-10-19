@@ -13,8 +13,8 @@
   /* Lookup tables with interpolation: the same maths, much faster per pixel. */
   var TN = 8192, LIN = new Float32Array(TN + 2), GAM = new Float32Array(TN + 2);
   for (var ti = 0; ti <= TN + 1; ti++) { LIN[ti] = toLinExact(Math.min(1, ti / TN)); GAM[ti] = toGamExact(Math.min(1, ti / TN)); }
-  function toLin(c) { c = c < 0 ? 0 : c > 1 ? 1 : c; var x = c * TN, i = x | 0, f = x - i; return LIN[i] + (LIN[i + 1] - LIN[i]) * f; }
-  function toGam(c) { c = c < 0 ? 0 : c > 1 ? 1 : c; var x = c * TN, i = x | 0, f = x - i; return GAM[i] + (GAM[i + 1] - GAM[i]) * f; }
+  function toLin(c) { if (c > 1) return Math.pow((c + 0.055) / 1.055, 2.4); c = c < 0 ? 0 : c; var x = c * TN, i = x | 0, f = x - i; return LIN[i] + (LIN[i + 1] - LIN[i]) * f; }
+  function toGam(c) { if (c > 1) return 1.055 * Math.pow(c, 1 / 2.4) - 0.055; c = c < 0 ? 0 : c; var x = c * TN, i = x | 0, f = x - i; return GAM[i] + (GAM[i + 1] - GAM[i]) * f; }
   function rgbToLab(r, g, b, o) {
     r = toLin(r); g = toLin(g); b = toLin(b);
     var l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b),
@@ -74,7 +74,38 @@
     if (c.b) S.curveB = c.b.map(function (q) { return q.slice(); });
     return S;
   };
+  /* Scale a whole preset toward "no change". t = 1 keeps it, 0 removes it. Curves are pulled toward the straight line. */
+  var SCALE_EXTRA = ['Texture', 'Clarity2012', 'Dehaze', 'ShadowTint', 'RedHue', 'RedSaturation', 'GreenHue', 'GreenSaturation', 'BlueHue', 'BlueSaturation',
+    'SplitToningShadowSaturation', 'SplitToningHighlightSaturation', 'ParametricShadows', 'ParametricDarks', 'ParametricLights', 'ParametricHighlights', 'GrainAmount', 'PostCropVignetteAmount'];
+  X.scale = function (S, t) {
+    if (t >= 1) return S;
+    t = Math.max(0, t);
+    var O = JSON.parse(JSON.stringify(S));
+    function r(v) { return Math.round(v * t); }
+    O.exposure = Math.round(S.exposure * t * 100) / 100;
+    ['contrast', 'highlights', 'shadows', 'whites', 'blacks', 'vibrance', 'temp', 'tint', 'sat'].forEach(function (k) { O[k] = r(S[k] || 0); });
+    for (var i = 0; i < 8; i++) { O.hue[i] = r(S.hue[i]); O.bsat[i] = r(S.bsat[i]); O.lum[i] = r(S.lum ? S.lum[i] : 0); }
+    SCALE_EXTRA.forEach(function (k) { if (S.extra && S.extra[k] !== undefined) O.extra[k] = r(S.extra[k]); });
+    ['curve', 'curveR', 'curveG', 'curveB'].forEach(function (k) {
+      O[k] = S[k].map(function (p) { return [p[0], Math.round(p[0] + (p[1] - p[0]) * t)]; });
+    });
+    return O;
+  };
   function ex(S, k) { var v = S.extra && S.extra[k]; return v === undefined ? (EXTRA_DEF[k] || 0) : v; }
+  /* Lab to RGB that pulls colour back (instead of clipping a channel) when it would leave the displayable range. */
+  function labToRgbFit(L, a, b, ceil, o) {
+    var t = 1, lo = 0, hi = 1, i, l, m, q, R, G, B;
+    for (i = 0; i < 9; i++) {
+      l = L + 0.3963377774 * a * t + 0.2158037573 * b * t; m = L - 0.1055613458 * a * t - 0.0638541728 * b * t; q = L - 0.0894841775 * a * t - 1.2914855480 * b * t;
+      l = l * l * l; m = m * m * m; q = q * q * q;
+      R = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * q; G = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * q; B = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * q;
+      if (R <= ceil && G <= ceil && B <= ceil && R >= -0.002 && G >= -0.002 && B >= -0.002) { if (i === 0) break; lo = t; } else hi = t;
+      if (i === 0 && hi === 1) { /* first try failed */ }
+      t = (lo + hi) / 2;
+      if (i === 8) { t = lo; l = L + 0.3963377774 * a * t + 0.2158037573 * b * t; m = L - 0.1055613458 * a * t - 0.0638541728 * b * t; q = L - 0.0894841775 * a * t - 1.2914855480 * b * t; l = l * l * l; m = m * m * m; q = q * q * q; R = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * q; G = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * q; B = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * q; }
+    }
+    o[0] = toGam(R); o[1] = toGam(G); o[2] = toGam(B);
+  }
   function hsv2rgb(h, o) { h = ((h % 360) + 360) % 360 / 60; var f = h - Math.floor(h), i = Math.floor(h) % 6, q = 1 - f; var t = [[1, f, 0], [q, 1, 0], [0, 1, f], [0, q, 1], [f, 0, 1], [1, 0, q]][i]; o[0] = t[0]; o[1] = t[1]; o[2] = t[2]; }
   function isIdCurve(c) { return c.length === 2 && c[0][0] === 0 && c[0][1] === 0 && c[1][0] === 255 && c[1][1] === 255; }
   X.isIdentityCurve = isIdCurve;
@@ -119,12 +150,12 @@
     var vAmt = ex(S, 'PostCropVignetteAmount') / 100, useVig = !!width && vAmt !== 0, vMid = ex(S, 'PostCropVignetteMidpoint') / 100, vFe = ex(S, 'PostCropVignetteFeather') / 100;
     var vH = width ? n / width : 1, vA0 = vMid * 0.9, vA1 = vA0 + vFe * 0.7 + 0.05;
     var tm = X.curveTable(S.curve), tr = X.curveTable(S.curveR), tg = X.curveTable(S.curveG), tb = X.curveTable(S.curveB);
-    var gs = 1 + S.sat / 100, i, k, r, g, b;
+    var useKnee = false, gs = 1 + S.sat / 100, i, k, r, g, b;
     var flat = !useLum && S.hue.every(function (v) { return v === 0; }) && S.bsat.every(function (v) { return v === 0; });
     var E = S.exposure || 0, CO = (S.contrast || 0) / 100, HI = (S.highlights || 0) / 100, SH = (S.shadows || 0) / 100, WH = (S.whites || 0) / 100, BL = (S.blacks || 0) / 100;
     var VI = (S.vibrance || 0) / 100, TE = (S.temp || 0) / 100, TI = (S.tint || 0) / 100;
     var useWB = E !== 0 || TE !== 0 || TI !== 0, useTone = CO || HI || SH || WH || BL || usePar, useVib = VI !== 0;
-    var gE = Math.pow(2, E), gR = gE * Math.pow(2, 0.5 * TE), gB = gE * Math.pow(2, -0.5 * TE), gG = gE * Math.pow(2, -0.3 * TI);
+    useKnee = useWB || useTone; var gE = Math.pow(2, E), gR = gE * Math.pow(2, 0.5 * TE), gB = gE * Math.pow(2, -0.5 * TE), gG = gE * Math.pow(2, -0.3 * TI);
     for (i = 0; i < n; i++) {
       r = px[i * 4] / 255; g = px[i * 4 + 1] / 255; b = px[i * 4 + 2] / 255;
       if (useWB) { r = toGam(toLin(r) * gR); g = toGam(toLin(g) * gG); b = toGam(toLin(b) * gB); }
@@ -136,15 +167,15 @@
         dY += BL * 0.2 * (1 - ss01(0, 0.45, Y));
         dY -= CO * 0.16 * Math.sin(2 * Math.PI * Y);
         if (usePar) { var gz = function (c) { var z = (Y - c) / 0.17; return Math.exp(-z * z); }; dY += 0.16 * (PS * gz(cS) + PD * gz(cD) + PL * gz(cL) + PH * gz(cH)); }
-        r = clamp(r + dY, 0, 1); g = clamp(g + dY, 0, 1); b = clamp(b + dY, 0, 1);
+        r = clamp(r + dY, 0, 3); g = clamp(g + dY, 0, 3); b = clamp(b + dY, 0, 3);
       }
       if (useVib) {
         var mx = Math.max(r, g, b), mn = Math.min(r, g, b), sv = mx > 0 ? (mx - mn) / mx : 0, bo = VI * (1 - sv) * 0.8, me = (r + g + b) / 3;
-        r = clamp(r + (r - me) * bo, 0, 1); g = clamp(g + (g - me) * bo, 0, 1); b = clamp(b + (b - me) * bo, 0, 1);
+        r = clamp(r + (r - me) * bo, 0, 3); g = clamp(g + (g - me) * bo, 0, 3); b = clamp(b + (b - me) * bo, 0, 3);
       }
       if (useColour && flat) {
         rgbToLab(r, g, b, lab);
-        labToRgb(lab[0], lab[1] * gs, lab[2] * gs, rgb); r = rgb[0]; g = rgb[1]; b = rgb[2];
+        labToRgbFit(lab[0], lab[1] * gs, lab[2] * gs, toLin(Math.max(1, r, g, b)), rgb); r = rgb[0]; g = rgb[1]; b = rgb[2];
       } else if (useColour) {
         rgbToLab(r, g, b, lab);
         var C = Math.sqrt(lab[1] * lab[1] + lab[2] * lab[2]);
@@ -152,11 +183,13 @@
           var h = Math.atan2(lab[2], lab[1]) * 180 / Math.PI, dh = 0, f = 0;
           bandWeights(h, w);
           var dl = 0; for (k = 0; k < 8; k++) { dh += w[k] * S.hue[k]; f += w[k] * (1 + S.bsat[k] / 100); dl += w[k] * LU[k]; }
-          lab[0] = clamp(lab[0] + dl * 0.0022, 0, 1);
-          var C2 = C * gs * f, h2 = (h + dh * 0.3) * Math.PI / 180;
-          labToRgb(lab[0], C2 * Math.cos(h2), C2 * Math.sin(h2), rgb); r = rgb[0]; g = rgb[1]; b = rgb[2];
+          var wC = ss01(0, 0.06, C);
+          lab[0] = lab[0] + dl * 0.0022 * wC; if (lab[0] > 0.92) lab[0] = 0.92 + 0.08 * (1 - Math.exp((0.92 - lab[0]) / 0.08)); else if (lab[0] < 0) lab[0] = 0;
+          var C2 = C * gs * f, h2 = (h + dh * 0.3 * wC) * Math.PI / 180;
+          labToRgbFit(lab[0], C2 * Math.cos(h2), C2 * Math.sin(h2), toLin(Math.max(1, r, g, b)), rgb); r = rgb[0]; g = rgb[1]; b = rgb[2];
         }
       }
+      if (useKnee) { if (r > 0.92) r = 0.92 + 0.08 * (1 - Math.exp((0.92 - r) / 0.08)); if (g > 0.92) g = 0.92 + 0.08 * (1 - Math.exp((0.92 - g) / 0.08)); if (b > 0.92) b = 0.92 + 0.08 * (1 - Math.exp((0.92 - b) / 0.08)); }
       r = look(tr, look(tm, r)); g = look(tg, look(tm, g)); b = look(tb, look(tm, b));
       if (useSplit) {
         var Y2 = 0.2126 * r + 0.7152 * g + 0.0722 * b, wh2 = ss01(pivot - 0.3, pivot + 0.3, Y2), ws = (1 - wh2) * stSh * 0.3, wi = wh2 * stHi * 0.3;
