@@ -128,3 +128,5 @@ select{background:#111;color:#f2f2f2;border:1px solid var(--line);border-radius:
 .libitem small{color:var(--dim);margin-left:6px}.libitem.on small{color:#333}
 .libnone{padding:12px;color:var(--dim);font-size:13px}
 .libpick{margin-top:10px}.libpick .dim{margin-left:8px}
+.empty{position:static;padding:10px 12px;background:#000;border-top:1px solid var(--line)}
+@media(max-width:860px){.grid>.stagecard{order:-1}}
